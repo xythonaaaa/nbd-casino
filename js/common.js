@@ -1198,6 +1198,10 @@ function base64ToBuffer(base64) {
   return Uint8Array.from(atob(base64), char => char.charCodeAt(0));
 }
 
+function canUsePasswordCrypto() {
+  return window.isSecureContext && !!window.crypto?.subtle;
+}
+
 async function hashPassword(password, saltBuffer) {
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
@@ -2383,10 +2387,19 @@ function initAuthModal() {
       }
 
       submitBtn.disabled = true;
+      if (!canUsePasswordCrypto()) {
+        errorEl.textContent = 'Registration requires HTTPS. Open https://nbdcasino.com (not http).';
+        errorEl.hidden = false;
+        successEl.hidden = true;
+        submitBtn.disabled = false;
+        return;
+      }
       try {
         await createAccount(username, password);
       } catch {
-        errorEl.textContent = 'Could not create account. Please try again.';
+        errorEl.textContent = canUsePasswordCrypto()
+          ? 'Could not create account. Please try again.'
+          : 'Registration requires HTTPS. Open https://nbdcasino.com (not http).';
         errorEl.hidden = false;
         successEl.hidden = true;
         submitBtn.disabled = false;
@@ -3247,6 +3260,10 @@ function initCasinoThemeLoader() {
 }
 
 function initCommon() {
+  if (location.protocol === 'http:' && /nbdcasino\.com$/i.test(location.hostname)) {
+    location.replace(`https://${location.host}${location.pathname}${location.search}${location.hash}`);
+    return;
+  }
   captureReferralFromUrl();
   backfillRegisteredUsers();
   initSidebarNav();

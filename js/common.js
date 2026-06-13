@@ -611,12 +611,25 @@ function recordProfileRound(wagered, won, extra) {
 
 const LEADERBOARD_KEY = 'nbd-leaderboard-v2';
 const LEADERBOARD_MAX = 500;
+const LEADERBOARD_POLL_MS = 5000;
+
+let leaderboardCache = { wins: [], bets: {} };
+let leaderboardUsingServer = false;
+let leaderboardPollTimer = null;
+
+function getLeaderboardApiUrl() {
+  if (window.NBD_LEADERBOARD_API) return window.NBD_LEADERBOARD_API;
+  if (location.protocol === 'http:' || location.protocol === 'https:') {
+    return `${location.origin}/api/leaderboard`;
+  }
+  return null;
+}
 
 function getPageGameId() {
   return (location.pathname.split('/').pop() || '').replace(/\.html$/i, '') || null;
 }
 
-function loadLeaderboard() {
+function loadLeaderboardLocal() {
   try {
     const raw = localStorage.getItem(LEADERBOARD_KEY);
     if (!raw) return { wins: [], bets: {} };
@@ -630,25 +643,97 @@ function loadLeaderboard() {
   }
 }
 
-function saveLeaderboard(data) {
+function saveLeaderboardLocal(data) {
   localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(data));
   document.dispatchEvent(new CustomEvent('xython:leaderboard-change', { detail: data }));
 }
 
-function recordLeaderboardRound({ game, bet, payout, mult, won }) {
-  if (!game || !isLoggedIn()) return;
+function loadLeaderboard() {
+  return leaderboardUsingServer ? leaderboardCache : loadLeaderboardLocal();
+}
 
-  const data = loadLeaderboard();
-  data.bets[game] = (data.bets[game] || 0) + 1;
+async function fetchLeaderboardFromServer() {
+  const url = getLeaderboardApiUrl();
+  if (!url) return null;
+
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      wins: Array.isArray(data.wins) ? data.wins : [],
+      bets: data.bets && typeof data.bets === 'object' ? data.bets : {},
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function refreshLeaderboard() {
+  const remote = await fetchLeaderboardFromServer();
+  if (remote !== null) {
+    leaderboardUsingServer = true;
+    leaderboardCache = remote;
+    document.dispatchEvent(new CustomEvent('xython:leaderboard-change', { detail: leaderboardCache }));
+    return leaderboardCache;
+  }
+
+  leaderboardUsingServer = false;
+  leaderboardCache = loadLeaderboardLocal();
+  document.dispatchEvent(new CustomEvent('xython:leaderboard-change', { detail: leaderboardCache }));
+  return leaderboardCache;
+}
+
+function startLeaderboardPolling() {
+  refreshLeaderboard();
+  if (leaderboardPollTimer) clearInterval(leaderboardPollTimer);
+  leaderboardPollTimer = setInterval(refreshLeaderboard, LEADERBOARD_POLL_MS);
+}
+
+async function recordLeaderboardRound({ game, bet, payout, mult, won }) {
+  if (!game || !isLoggedIn()) return;
 
   const betAmt = parseFloat(bet) || 0;
   const payAmt = parseFloat(payout) || 0;
+  const hidden = !!loadUserSettings().privateMode;
+  const user = hidden ? 'Hidden' : (getLoggedInUsername() || 'Player');
+  const multiplier = mult != null ? parseFloat(mult) : (betAmt > 0 ? payAmt / betAmt : 0);
+
+  const payload = {
+    game,
+    user,
+    hidden,
+    bet: betAmt,
+    payout: payAmt,
+    mult: Math.round(multiplier * 100) / 100,
+    won: won === true,
+  };
+
+  const url = getLeaderboardApiUrl();
+  if (url) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        leaderboardUsingServer = true;
+        leaderboardCache = {
+          wins: Array.isArray(data.wins) ? data.wins : [],
+          bets: data.bets && typeof data.bets === 'object' ? data.bets : {},
+        };
+        document.dispatchEvent(new CustomEvent('xython:leaderboard-change', { detail: leaderboardCache }));
+        return;
+      }
+    } catch { /* fallback to local */ }
+  }
+
+  const data = loadLeaderboardLocal();
+  data.bets[game] = (data.bets[game] || 0) + 1;
 
   if (won === true && payAmt > betAmt) {
-    const hidden = !!loadUserSettings().privateMode;
-    const user = hidden ? 'Hidden' : (getLoggedInUsername() || 'Player');
-    const multiplier = mult != null ? parseFloat(mult) : (betAmt > 0 ? payAmt / betAmt : 0);
-
     data.wins.unshift({
       id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
       game,
@@ -663,7 +748,8 @@ function recordLeaderboardRound({ game, bet, payout, mult, won }) {
     if (data.wins.length > LEADERBOARD_MAX) data.wins.length = LEADERBOARD_MAX;
   }
 
-  saveLeaderboard(data);
+  saveLeaderboardLocal(data);
+  leaderboardCache = data;
 }
 
 function getLeaderboardWins(game, sort, limit = 5) {
@@ -681,6 +767,8 @@ window.NbdLeaderboard = {
   getBigWins: game => getLeaderboardWins(game, 'big'),
   getLuckyWins: game => getLeaderboardWins(game, 'lucky'),
   getBetCount: getLeaderboardBetCount,
+  refresh: refreshLeaderboard,
+  isShared: () => leaderboardUsingServer,
   getRecentWins(limit = 20) {
     return loadLeaderboard().wins
       .slice()
@@ -690,7 +778,7 @@ window.NbdLeaderboard = {
   reset() {
     localStorage.removeItem(LEADERBOARD_KEY);
     localStorage.removeItem('nbd-gi-bets');
-    document.dispatchEvent(new CustomEvent('xython:leaderboard-change'));
+    refreshLeaderboard();
   },
 };
 
@@ -2889,6 +2977,7 @@ function initCommon() {
   initUserSettings();
   initPanelTabs();
   initChat();
+  startLeaderboardPolling();
   initCasinoThemeLoader();
   initGameInfoLoader();
 }

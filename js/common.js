@@ -118,50 +118,73 @@ function renderLiveWins(gamePool) {
   if (!track) return;
 
   const realWins = window.NbdLeaderboard?.getRecentWins?.(20) || [];
-  let items;
+  if (!realWins.length) {
+    track.innerHTML = '<div class="win-item win-item--empty"><span class="game-name">No live wins yet — be the first!</span></div>';
+    return;
+  }
 
-  if (realWins.length) {
-    items = realWins.map(w => {
-      const gameName = GAME_ID_NAMES[w.game] || w.game;
-      const player = w.hidden ? 'Hidden' : (w.user.length > 8 ? `${w.user.slice(0, 7)}…` : w.user);
-      return `<div class="win-item win-item--real">
-        <span class="game-name">${gameName}</span>
-        <span class="player">${player}</span>
-        <span class="amount">$${w.payout.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-      </div>`;
-    });
-    while (items.length < 8) {
-      items = items.concat(items);
-    }
-  } else {
-    items = Array.from({ length: 16 }, () => {
-      const game = randomFrom(gamePool);
-      return `<div class="win-item">
-        <span class="game-name">${game.name}</span>
-        <span class="player">${randomFrom(PLAYERS)}</span>
-        <span class="amount">$${randomAmount(10, 5000)}</span>
-      </div>`;
-    });
+  let items = realWins.map(w => {
+    const gameName = GAME_ID_NAMES[w.game] || w.game;
+    const player = w.hidden ? 'Hidden' : (w.user.length > 8 ? `${w.user.slice(0, 7)}…` : w.user);
+    return `<div class="win-item win-item--real">
+      <span class="game-name">${gameName}</span>
+      <span class="player">${player}</span>
+      <span class="amount">$${w.payout.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+    </div>`;
+  });
+  while (items.length < 8) {
+    items = items.concat(items);
   }
 
   track.innerHTML = items.join('') + items.join('');
 }
 
-function renderBets(gamePool) {
+function getActiveBetsFilter() {
+  const active = document.querySelector('.bets-subtab.active');
+  const text = (active?.textContent || '').trim().toLowerCase();
+  if (text.includes('high')) return 'high';
+  if (text.includes('my')) return 'mine';
+  return 'all';
+}
+
+function formatBetMoney(n) {
+  return `$${(parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function renderBets() {
   const list = document.getElementById('betsList');
   if (!list) return;
 
-  list.innerHTML = Array.from({ length: 20 }, () => {
-    const game = randomFrom(gamePool);
-    const amount = randomAmount(1, 500);
-    const mult = (Math.random() * 50 + 1).toFixed(2);
-    return `<div class="bet-item">
-      <span class="bet-game">${game.name}</span>
-      <span class="bet-amount">$${amount}</span>
-      <span class="bet-player">${randomFrom(PLAYERS)}</span>
-      <span class="bet-multiplier">${mult}x</span>
+  const filter = getActiveBetsFilter();
+  const bets = window.NbdLeaderboard?.getRecentBets?.(50, filter) || [];
+
+  if (!bets.length) {
+    const emptyMsg = filter === 'mine'
+      ? (isLoggedIn() ? 'No bets yet — play a game to see your activity here.' : 'Log in to see your bets.')
+      : filter === 'high'
+        ? 'No high roller bets yet.'
+        : 'No live bets yet — play a game to appear here.';
+    list.innerHTML = `<p class="bets-empty">${emptyMsg}</p>`;
+    return;
+  }
+
+  list.innerHTML = bets.map(b => {
+    const gameName = GAME_ID_NAMES[b.game] || b.game;
+    const player = b.hidden ? 'Hidden' : b.user;
+    const mult = (parseFloat(b.mult) || 0).toFixed(2);
+    const multClass = b.won && parseFloat(b.mult) > 1 ? 'bet-multiplier bet-multiplier--win' : 'bet-multiplier';
+    return `<div class="bet-item bet-item--real">
+      <span class="bet-game">${gameName}</span>
+      <span class="bet-amount">${formatBetMoney(b.bet)}</span>
+      <span class="bet-player">${player}</span>
+      <span class="${multClass}">${mult}x</span>
     </div>`;
   }).join('');
+}
+
+function initLiveBets() {
+  renderBets();
+  document.addEventListener('xython:leaderboard-change', renderBets);
 }
 
 let chatCache = [];
@@ -490,10 +513,7 @@ function initPanelTabs() {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.bets-subtab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
-      const pool = document.body.dataset.page === 'originals'
-        ? GAMES.originals
-        : [...GAMES.originals, ...GAMES.slots, ...GAMES.live];
-      renderBets(pool);
+      renderBets();
     });
   });
 }
@@ -611,9 +631,11 @@ function recordProfileRound(wagered, won, extra) {
 
 const LEADERBOARD_KEY = 'nbd-leaderboard-v2';
 const LEADERBOARD_MAX = 500;
+const RECENT_BETS_MAX = 100;
+const HIGH_ROLLER_MIN = 100;
 const LEADERBOARD_POLL_MS = 5000;
 
-let leaderboardCache = { wins: [], bets: {} };
+let leaderboardCache = { wins: [], bets: {}, recentBets: [] };
 let leaderboardUsingServer = false;
 let leaderboardPollTimer = null;
 
@@ -629,17 +651,21 @@ function getPageGameId() {
   return (location.pathname.split('/').pop() || '').replace(/\.html$/i, '') || null;
 }
 
+function normalizeLeaderboardData(data) {
+  return {
+    wins: Array.isArray(data?.wins) ? data.wins : [],
+    bets: data?.bets && typeof data.bets === 'object' ? data.bets : {},
+    recentBets: Array.isArray(data?.recentBets) ? data.recentBets : [],
+  };
+}
+
 function loadLeaderboardLocal() {
   try {
     const raw = localStorage.getItem(LEADERBOARD_KEY);
-    if (!raw) return { wins: [], bets: {} };
-    const data = JSON.parse(raw);
-    return {
-      wins: Array.isArray(data.wins) ? data.wins : [],
-      bets: data.bets && typeof data.bets === 'object' ? data.bets : {},
-    };
+    if (!raw) return { wins: [], bets: {}, recentBets: [] };
+    return normalizeLeaderboardData(JSON.parse(raw));
   } catch {
-    return { wins: [], bets: {} };
+    return { wins: [], bets: {}, recentBets: [] };
   }
 }
 
@@ -660,10 +686,7 @@ async function fetchLeaderboardFromServer() {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
     const data = await res.json();
-    return {
-      wins: Array.isArray(data.wins) ? data.wins : [],
-      bets: data.bets && typeof data.bets === 'object' ? data.bets : {},
-    };
+    return normalizeLeaderboardData(data);
   } catch {
     return null;
   }
@@ -690,6 +713,12 @@ function startLeaderboardPolling() {
   leaderboardPollTimer = setInterval(refreshLeaderboard, LEADERBOARD_POLL_MS);
 }
 
+function pushRecentBet(data, entry) {
+  if (!data.recentBets) data.recentBets = [];
+  data.recentBets.unshift(entry);
+  if (data.recentBets.length > RECENT_BETS_MAX) data.recentBets.length = RECENT_BETS_MAX;
+}
+
 async function recordLeaderboardRound({ game, bet, payout, mult, won }) {
   if (!game || !isLoggedIn()) return;
 
@@ -698,6 +727,7 @@ async function recordLeaderboardRound({ game, bet, payout, mult, won }) {
   const hidden = !!loadUserSettings().privateMode;
   const user = hidden ? 'Hidden' : (getLoggedInUsername() || 'Player');
   const multiplier = mult != null ? parseFloat(mult) : (betAmt > 0 ? payAmt / betAmt : 0);
+  const roundedMult = Math.round(multiplier * 100) / 100;
 
   const payload = {
     game,
@@ -705,7 +735,7 @@ async function recordLeaderboardRound({ game, bet, payout, mult, won }) {
     hidden,
     bet: betAmt,
     payout: payAmt,
-    mult: Math.round(multiplier * 100) / 100,
+    mult: roundedMult,
     won: won === true,
   };
 
@@ -720,10 +750,7 @@ async function recordLeaderboardRound({ game, bet, payout, mult, won }) {
       if (res.ok) {
         const data = await res.json();
         leaderboardUsingServer = true;
-        leaderboardCache = {
-          wins: Array.isArray(data.wins) ? data.wins : [],
-          bets: data.bets && typeof data.bets === 'object' ? data.bets : {},
-        };
+        leaderboardCache = normalizeLeaderboardData(data);
         document.dispatchEvent(new CustomEvent('xython:leaderboard-change', { detail: leaderboardCache }));
         return;
       }
@@ -733,6 +760,18 @@ async function recordLeaderboardRound({ game, bet, payout, mult, won }) {
   const data = loadLeaderboardLocal();
   data.bets[game] = (data.bets[game] || 0) + 1;
 
+  pushRecentBet(data, {
+    id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
+    game,
+    user,
+    hidden,
+    bet: betAmt,
+    payout: payAmt,
+    mult: roundedMult,
+    won: won === true,
+    ts: Date.now(),
+  });
+
   if (won === true && payAmt > betAmt) {
     data.wins.unshift({
       id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
@@ -741,7 +780,7 @@ async function recordLeaderboardRound({ game, bet, payout, mult, won }) {
       hidden,
       bet: betAmt,
       payout: payAmt,
-      mult: Math.round(multiplier * 100) / 100,
+      mult: roundedMult,
       ts: Date.now(),
     });
 
@@ -774,6 +813,16 @@ window.NbdLeaderboard = {
       .slice()
       .sort((a, b) => b.ts - a.ts)
       .slice(0, limit);
+  },
+  getRecentBets(limit = 50, filter = 'all') {
+    let bets = loadLeaderboard().recentBets.slice().sort((a, b) => b.ts - a.ts);
+    if (filter === 'high') bets = bets.filter(b => (parseFloat(b.bet) || 0) >= HIGH_ROLLER_MIN);
+    if (filter === 'mine') {
+      const me = getLoggedInUsername();
+      if (!me) return [];
+      bets = bets.filter(b => !b.hidden && b.user.toLowerCase() === me.toLowerCase());
+    }
+    return bets.slice(0, limit);
   },
   reset() {
     localStorage.removeItem(LEADERBOARD_KEY);
@@ -2978,6 +3027,7 @@ function initCommon() {
   initPanelTabs();
   initChat();
   startLeaderboardPolling();
+  initLiveBets();
   initCasinoThemeLoader();
   initGameInfoLoader();
 }

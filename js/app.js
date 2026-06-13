@@ -110,15 +110,12 @@ document.addEventListener('DOMContentLoaded', () => {
   initCommon();
   renderGames();
   renderProviders();
-  renderLiveWins([...GAMES.originals, ...GAMES.slots, ...GAMES.live]);
-  renderBets([...GAMES.originals, ...GAMES.slots, ...GAMES.live]);
-  renderChat();
+  renderLiveWins();
   initCarousel();
   initFilters();
   initCasinoJackpots();
-  setInterval(() => renderBets([...GAMES.originals, ...GAMES.slots, ...GAMES.live]), 15000);
   document.addEventListener('xython:leaderboard-change', () => {
-    renderLiveWins([...GAMES.originals, ...GAMES.slots, ...GAMES.live]);
+    renderLiveWins();
     updateJackpotPaid();
   });
 });

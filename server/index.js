@@ -368,6 +368,18 @@ function resetAllWallets(store) {
   return { ok: true, resetAt: store.resetAt };
 }
 
+function resetPlayerWallet(store, admin, username) {
+  const adminName = String(admin || '').trim();
+  const player = String(username || '').trim().slice(0, 16);
+  if (!isWalletAdmin(adminName)) return { error: 'Admin only' };
+  if (!player) return { error: 'Invalid username' };
+  const key = walletUserKey(player);
+  if (store.grants[key]) {
+    store.grants[key] = defaultWalletBalances();
+  }
+  return { ok: true, username: player, grants: getWalletGrants(store, player) };
+}
+
 function resetOriginalsLeaderboard(data) {
   data.wins = data.wins.filter(w => !ORIGINALS_GAMES.has(w.game));
   ORIGINALS_GAMES.forEach(game => {
@@ -428,6 +440,12 @@ function handleWalletRequest(req, res, urlPath) {
             return;
           }
           result = resetAllWallets(store);
+        } else if (action === 'reset-player') {
+          result = resetPlayerWallet(store, payload.admin, payload.username || payload.to);
+          if (result.error) {
+            sendJson(res, result.error === 'Admin only' ? 403 : 400, result);
+            return;
+          }
         } else {
           sendJson(res, 400, { error: 'Unknown action' });
           return;

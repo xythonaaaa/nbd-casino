@@ -3497,6 +3497,12 @@ function initAdminPanelModal() {
         </button>
       </div>
 
+      <div class="admin-panel-section">
+        <label class="deposit-label" for="adminPanelResetPlayerUser">Reset player wallet</label>
+        <input type="text" id="adminPanelResetPlayerUser" class="deposit-input send-money-recipient" maxlength="16" autocomplete="off" placeholder="Player username">
+        <button type="button" class="deposit-submit admin-panel-reset-player-btn" id="adminPanelResetPlayer">Reset Player</button>
+      </div>
+
       <p class="deposit-error" id="adminPanelError" hidden></p>
       <p class="deposit-success" id="adminPanelSuccess" hidden></p>
     </div>`;
@@ -3507,6 +3513,8 @@ function initAdminPanelModal() {
   const sendBtn = document.getElementById('adminPanelSendMoney');
   const resetBalancesBtn = document.getElementById('adminPanelResetBalances');
   const resetLeaderboardsBtn = document.getElementById('adminPanelResetLeaderboards');
+  const resetPlayerInput = document.getElementById('adminPanelResetPlayerUser');
+  const resetPlayerBtn = document.getElementById('adminPanelResetPlayer');
   const errorEl = document.getElementById('adminPanelError');
   const successEl = document.getElementById('adminPanelSuccess');
 
@@ -3593,6 +3601,44 @@ function initAdminPanelModal() {
 
     await refreshLeaderboard();
     successEl.textContent = 'Originals leaderboards cleared.';
+    successEl.hidden = false;
+  });
+
+  resetPlayerBtn.addEventListener('click', async () => {
+    if (!isAdmin()) return;
+    clearAdminPanelMessages();
+
+    const player = resetPlayerInput.value.trim();
+    const userError = validateUsername(player);
+
+    if (userError) {
+      errorEl.textContent = userError;
+      errorEl.hidden = false;
+      resetPlayerInput.focus();
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Reset ${player}'s wallet to $0?\n\nThis clears all play-money grants for that player only.`
+    );
+    if (!confirmed) return;
+
+    resetPlayerBtn.disabled = true;
+    const result = await postWalletAction({
+      action: 'reset-player',
+      admin: getLoggedInUsername(),
+      username: player,
+    });
+    resetPlayerBtn.disabled = false;
+
+    if (!result?.ok) {
+      errorEl.textContent = result?.data?.error || 'Could not reset player wallet. Try again.';
+      errorEl.hidden = false;
+      return;
+    }
+
+    resetPlayerInput.value = '';
+    successEl.textContent = `${player}'s wallet reset to $0.`;
     successEl.hidden = false;
   });
 

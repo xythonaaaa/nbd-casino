@@ -102,6 +102,21 @@ function resetAllWallets(store) {
   return { ok: true, resetAt: store.resetAt };
 }
 
+function resetPlayerWallet(store, admin, username) {
+  const adminName = String(admin || '').trim();
+  const player = String(username || '').trim().slice(0, 16);
+
+  if (!isAdmin(adminName)) return { error: 'Admin only' };
+  if (!player) return { error: 'Invalid username' };
+
+  const key = userKey(player);
+  if (store.grants[key]) {
+    store.grants[key] = defaultBalances();
+  }
+
+  return { ok: true, username: player, grants: getGrantsForUser(store, player) };
+}
+
 export default async (req) => {
   const store = getStore({ name: 'nbd-wallet', consistency: 'strong' });
 
@@ -147,6 +162,15 @@ export default async (req) => {
         if (!isAdmin(payload.admin)) return { error: 'Admin only' };
         return resetAllWallets(data);
       });
+      if (result.error) return Response.json(result, { status: result.error === 'Admin only' ? 403 : 400 });
+      return Response.json(result);
+    }
+
+    if (payload.action === 'reset-player') {
+      const target = payload.username || payload.to;
+      const result = await writeStore(store, data =>
+        resetPlayerWallet(data, payload.admin, target)
+      );
       if (result.error) return Response.json(result, { status: result.error === 'Admin only' ? 403 : 400 });
       return Response.json(result);
     }

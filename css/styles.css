@@ -1242,6 +1242,25 @@ input {
   line-height: 1.35;
 }
 
+.admin-panel-section {
+  margin-bottom: 12px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.admin-panel-section .deposit-label {
+  margin-top: 14px;
+}
+
+.admin-panel-reset-player-btn {
+  margin-top: 10px;
+  background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
+}
+
+.admin-panel-reset-player-btn:hover {
+  filter: brightness(1.08);
+}
+
 .vault-balances {
   display: grid;
   grid-template-columns: 1fr 1fr;

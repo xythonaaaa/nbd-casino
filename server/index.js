@@ -6,12 +6,15 @@ const ROOT = path.join(__dirname, '..');
 const CHAT_FILE = path.join(__dirname, 'chat-data.json');
 const LEADERBOARD_FILE = path.join(__dirname, 'leaderboard-data.json');
 const AFFILIATES_FILE = path.join(__dirname, 'affiliates-data.json');
+const WALLET_FILE = path.join(__dirname, 'wallet-data.json');
 const PORT = Number(process.env.PORT) || 8080;
 const MAX_MESSAGES = 200;
 const MAX_WINS = 500;
 const MAX_RECENT_BETS = 100;
 const AFFILIATE_COMMISSION_RATE = 0.05;
 const AFFILIATE_MIN_CLAIM = 0.01;
+const WALLET_ADMIN_USERNAMES = ['ceo'];
+const WALLET_CURRENCIES = ['USD', 'BTC', 'ETH', 'LTC'];
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -286,6 +289,128 @@ function handleAffiliatesRequest(req, res, urlPath) {
   sendJson(res, 405, { error: 'Method not allowed' });
 }
 
+function defaultWalletBalances() {
+  return { USD: 0, BTC: 0, ETH: 0, LTC: 0 };
+}
+
+function defaultWalletStore() {
+  return { users: [], grants: {} };
+}
+
+function loadWalletStore() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(WALLET_FILE, 'utf8'));
+    return {
+      users: Array.isArray(parsed.users) ? parsed.users : [],
+      grants: parsed.grants && typeof parsed.grants === 'object' ? parsed.grants : {},
+    };
+  } catch {
+    return defaultWalletStore();
+  }
+}
+
+function saveWalletStore(data) {
+  fs.mkdirSync(path.dirname(WALLET_FILE), { recursive: true });
+  fs.writeFileSync(WALLET_FILE, JSON.stringify(data, null, 2));
+}
+
+function walletUserKey(username) {
+  return String(username || '').trim().toLowerCase();
+}
+
+function isWalletAdmin(username) {
+  const name = walletUserKey(username);
+  return WALLET_ADMIN_USERNAMES.some(u => u.toLowerCase() === name);
+}
+
+function ensureWalletUser(store, username) {
+  const name = String(username || '').trim().slice(0, 16);
+  if (!name) return null;
+  const key = walletUserKey(name);
+  if (!store.users.some(u => u.toLowerCase() === key)) store.users.push(name);
+  return name;
+}
+
+function getWalletGrants(store, username) {
+  const key = walletUserKey(username);
+  const raw = store.grants[key] || defaultWalletBalances();
+  const grants = defaultWalletBalances();
+  WALLET_CURRENCIES.forEach(cur => {
+    grants[cur] = Math.max(0, parseFloat(raw[cur]) || 0);
+  });
+  return grants;
+}
+
+function sendWalletMoney(store, admin, to, amount, currency) {
+  const adminName = String(admin || '').trim();
+  const recipient = String(to || '').trim().slice(0, 16);
+  const cur = String(currency || 'USD').toUpperCase();
+  if (!isWalletAdmin(adminName)) return { error: 'Admin only' };
+  if (!recipient) return { error: 'Invalid recipient' };
+  if (!WALLET_CURRENCIES.includes(cur)) return { error: 'Invalid currency' };
+  const amt = parseFloat(amount);
+  if (!amt || amt <= 0) return { error: 'Invalid amount' };
+  ensureWalletUser(store, recipient);
+  const key = walletUserKey(recipient);
+  if (!store.grants[key]) store.grants[key] = defaultWalletBalances();
+  store.grants[key][cur] = (parseFloat(store.grants[key][cur]) || 0) + amt;
+  return { ok: true, to: recipient, amount: amt, currency: cur, grants: getWalletGrants(store, recipient) };
+}
+
+function handleWalletRequest(req, res, urlPath) {
+  const query = new URL(`http://local${urlPath}`).searchParams;
+
+  if (req.method === 'GET') {
+    const user = query.get('user') || '';
+    if (!user.trim()) {
+      sendJson(res, 400, { error: 'Missing user' });
+      return;
+    }
+    const store = loadWalletStore();
+    sendJson(res, 200, { grants: getWalletGrants(store, user) });
+    return;
+  }
+
+  if (req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const store = loadWalletStore();
+        const action = payload.action;
+        let result;
+
+        if (action === 'register') {
+          const name = ensureWalletUser(store, payload.username);
+          if (!name) {
+            sendJson(res, 400, { error: 'Invalid username' });
+            return;
+          }
+          result = { ok: true };
+        } else if (action === 'send') {
+          result = sendWalletMoney(store, payload.admin, payload.to, payload.amount, payload.currency);
+          if (result.error) {
+            sendJson(res, result.error === 'Admin only' ? 403 : 400, result);
+            return;
+          }
+        } else {
+          sendJson(res, 400, { error: 'Unknown action' });
+          return;
+        }
+
+        saveWalletStore(store);
+        sendJson(res, 200, result);
+      } catch {
+        sendJson(res, 400, { error: 'Bad request' });
+      }
+    });
+    return;
+  }
+
+  sendJson(res, 405, { error: 'Method not allowed' });
+}
+
 function appendLeaderboardRound(payload) {
   const game = String(payload.game || '').trim().slice(0, 32);
   if (!game) return null;
@@ -431,6 +556,11 @@ const server = http.createServer((req, res) => {
 
   if (req.url.startsWith('/api/affiliates')) {
     handleAffiliatesRequest(req, res, req.url);
+    return;
+  }
+
+  if (req.url.startsWith('/api/wallet')) {
+    handleWalletRequest(req, res, req.url);
     return;
   }
 

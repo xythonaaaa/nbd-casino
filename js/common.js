@@ -1031,6 +1031,7 @@ const AFFILIATE_STORE_KEY = 'xython-affiliate-store';
 const AFFILIATE_COMMISSION_RATE = 0.05;
 const AFFILIATE_MIN_CLAIM = 0.01;
 const AFFILIATE_POLL_MS = 5000;
+const SITE_URL = 'https://nbdcasino.com';
 
 let affiliateCache = {};
 let affiliateUsingServer = false;
@@ -1583,7 +1584,11 @@ function getReferralLink(username) {
     const indexUrl = current.replace(/[^/\\]+$/, 'index.html');
     return `${indexUrl}?ref=${code}`;
   }
-  return `${window.location.origin}/?ref=${code}`;
+  const host = window.location.hostname;
+  const base = (host === 'localhost' || host === '127.0.0.1')
+    ? window.location.origin
+    : SITE_URL;
+  return `${base.replace(/\/$/, '')}/?ref=${code}`;
 }
 
 async function claimAffiliateCommission(username) {

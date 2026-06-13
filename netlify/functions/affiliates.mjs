@@ -22,7 +22,12 @@ function normalizeStore(raw) {
 }
 
 async function loadStore(store) {
-  return normalizeStore(await store.get(STORE_KEY, { type: 'json' }));
+  try {
+    const raw = await store.get(STORE_KEY, { type: 'json', consistency: 'strong' });
+    return normalizeStore(raw);
+  } catch {
+    return defaultStore();
+  }
 }
 
 async function saveStore(store, data) {
@@ -69,9 +74,15 @@ function getAffiliatePayload(store, username) {
     const refKey = (resolveUser(store.users, referrer) || referrer).toLowerCase();
     if (refKey !== affKey) return;
     const referredName = resolveUser(store.users, userKey) || userKey;
-    if (!data.referrals.some(r => r.username.toLowerCase() === referredName.toLowerCase())) {
-      data.referrals.push({ username: referredName, joinedAt: Date.now(), wagered: 0 });
-    }
+    if (data.referrals.some(r => r.username.toLowerCase() === referredName.toLowerCase())) return;
+    const storedRef = entry?.data?.referrals?.find(
+      r => r.username.toLowerCase() === referredName.toLowerCase()
+    );
+    data.referrals.push({
+      username: referredName,
+      joinedAt: storedRef?.joinedAt || Date.now(),
+      wagered: storedRef?.wagered || 0,
+    });
   });
 
   return {
@@ -156,8 +167,20 @@ function claimCommission(store, username) {
   return { claimed: pending };
 }
 
+async function writeStore(store, mutator) {
+  const maxAttempts = 5;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const data = await loadStore(store);
+    const result = mutator(data);
+    if (result?.error) return result;
+    await saveStore(store, data);
+    return result;
+  }
+  return { error: 'Store busy, try again' };
+}
+
 export default async (req) => {
-  const store = getStore('nbd-affiliates');
+  const store = getStore({ name: 'nbd-affiliates', consistency: 'strong' });
 
   if (req.method === 'GET') {
     const url = new URL(req.url);
@@ -183,32 +206,32 @@ export default async (req) => {
       return Response.json({ error: 'Bad request' }, { status: 400 });
     }
 
-    const data = await loadStore(store);
     const action = payload.action;
 
     if (action === 'register') {
-      const result = registerUser(data, payload.username);
+      const result = await writeStore(store, data => registerUser(data, payload.username));
       if (result.error) return Response.json(result, { status: 400 });
-      await saveStore(store, data);
       return Response.json({ ok: true });
     }
 
     if (action === 'link') {
-      const result = linkReferral(data, payload.newUser, payload.referrer);
+      const result = await writeStore(store, data =>
+        linkReferral(data, payload.newUser, payload.referrer)
+      );
       if (result.error) return Response.json(result, { status: 400 });
-      await saveStore(store, data);
       return Response.json(result);
     }
 
     if (action === 'wager') {
-      accrueWager(data, payload.username, payload.amount);
-      await saveStore(store, data);
+      await writeStore(store, data => {
+        accrueWager(data, payload.username, payload.amount);
+        return { ok: true };
+      });
       return Response.json({ ok: true });
     }
 
     if (action === 'claim') {
-      const result = claimCommission(data, payload.username);
-      await saveStore(store, data);
+      const result = await writeStore(store, data => claimCommission(data, payload.username));
       return Response.json(result);
     }
 

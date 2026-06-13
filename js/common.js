@@ -18,10 +18,128 @@ function canDeposit() {
   return isLoggedIn() && isAdmin();
 }
 
-function updateDepositButtonVisibility() {
+const GRANTS_SYNC_KEY = 'xython-grants-synced';
+const WALLET_GRANTS_POLL_MS = 8000;
+const WALLET_CURRENCIES = ['USD', 'BTC', 'ETH', 'LTC'];
+
+let walletGrantsPollTimer = null;
+
+function getWalletApiUrl() {
+  if (window.NBD_WALLET_API) return window.NBD_WALLET_API;
+  if (location.protocol === 'http:' || location.protocol === 'https:') {
+    return `${location.origin}/api/wallet`;
+  }
+  return null;
+}
+
+async function postWalletAction(payload) {
+  const url = getWalletApiUrl();
+  if (!url) return null;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  } catch {
+    return null;
+  }
+}
+
+async function registerUserOnWalletServer(username) {
+  const result = await postWalletAction({ action: 'register', username });
+  return !!result?.ok;
+}
+
+function loadGrantsSynced() {
+  try {
+    const raw = localStorage.getItem(GRANTS_SYNC_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveGrantsSynced(data) {
+  localStorage.setItem(GRANTS_SYNC_KEY, JSON.stringify(data));
+}
+
+async function fetchServerGrants(username) {
+  const url = getWalletApiUrl();
+  if (!url || !username) return null;
+  try {
+    const res = await fetch(`${url}?user=${encodeURIComponent(username)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.grants && typeof data.grants === 'object' ? data.grants : null;
+  } catch {
+    return null;
+  }
+}
+
+async function syncWalletGrantsFromServer() {
+  const username = getLoggedInUsername();
+  if (!username) return;
+
+  const serverGrants = await fetchServerGrants(username);
+  if (!serverGrants) return;
+
+  const synced = loadGrantsSynced();
+  const userKey = username.toLowerCase();
+  if (!synced[userKey]) synced[userKey] = { USD: 0, BTC: 0, ETH: 0, LTC: 0 };
+
+  WALLET_CURRENCIES.forEach(currency => {
+    const serverTotal = parseFloat(serverGrants[currency]) || 0;
+    const applied = parseFloat(synced[userKey][currency]) || 0;
+    const delta = serverTotal - applied;
+    if (delta <= 0) return;
+
+    const balance = getWalletBalance(currency) + delta;
+    window.XythonWallet?.setBalance?.(currency, balance, {
+      type: 'reward',
+      label: 'Transfer',
+      detail: `Received ${formatWalletDisplay(currency, delta)} ${currency}`,
+    });
+    synced[userKey][currency] = serverTotal;
+  });
+
+  saveGrantsSynced(synced);
+}
+
+function startWalletGrantsPolling() {
+  syncWalletGrantsFromServer();
+  if (walletGrantsPollTimer) clearInterval(walletGrantsPollTimer);
+  walletGrantsPollTimer = setInterval(syncWalletGrantsFromServer, WALLET_GRANTS_POLL_MS);
+}
+
+function ensureAdminWalletButtons() {
   const depositBtn = document.getElementById('walletDeposit');
-  if (!depositBtn) return;
-  depositBtn.hidden = !canDeposit();
+  if (!depositBtn || document.getElementById('walletSend')) return;
+
+  const sendBtn = document.createElement('button');
+  sendBtn.className = 'wallet-send';
+  sendBtn.id = 'walletSend';
+  sendBtn.type = 'button';
+  sendBtn.textContent = 'Send Money';
+  sendBtn.hidden = true;
+  depositBtn.insertAdjacentElement('beforebegin', sendBtn);
+}
+
+function updateAdminWalletButtons() {
+  ensureAdminWalletButtons();
+  const depositBtn = document.getElementById('walletDeposit');
+  const sendBtn = document.getElementById('walletSend');
+  const show = canDeposit();
+  if (depositBtn) depositBtn.hidden = !show;
+  if (sendBtn) sendBtn.hidden = !show;
+  document.querySelector('.header-wallet')?.classList.toggle('has-admin-actions', show);
+}
+
+function updateDepositButtonVisibility() {
+  updateAdminWalletButtons();
 }
 
 const DEFAULT_WALLET = {
@@ -1151,7 +1269,10 @@ function startAffiliatePolling() {
 
 async function syncCurrentUserToServer() {
   const username = getLoggedInUsername();
-  if (username) await registerUserOnServer(username);
+  if (username) {
+    await registerUserOnServer(username);
+    registerUserOnWalletServer(username);
+  }
 }
 
 function loadRegisteredUsers() {
@@ -1267,6 +1388,7 @@ async function createAccount(username, password) {
   saveAccounts(accounts);
   markUserRegistered(username);
   await registerUserOnServer(username);
+  registerUserOnWalletServer(username);
 }
 
 function backfillRegisteredUsers() {
@@ -2651,6 +2773,8 @@ function initWallet() {
   const iconEl = balanceBtn?.querySelector('.wallet-currency-icon');
   if (!balanceBtn || !dropdown) return;
 
+  ensureAdminWalletButtons();
+
   function closeDropdown() {
     dropdown.hidden = true;
     balanceBtn.setAttribute('aria-expanded', 'false');
@@ -2686,6 +2810,13 @@ function initWallet() {
     openDepositModal();
   });
 
+  document.getElementById('walletSend')?.addEventListener('click', e => {
+    e.stopPropagation();
+    closeDropdown();
+    if (!canDeposit()) return;
+    openSendMoneyModal();
+  });
+
   document.addEventListener('click', closeDropdown);
 
   initDepositModal({ getActiveCurrency: () => {
@@ -2693,9 +2824,17 @@ function initWallet() {
     return active?.dataset.currency || 'USD';
   }});
 
-  updateDepositButtonVisibility();
+  initSendMoneyModal({ getActiveCurrency: () => {
+    const active = document.querySelector('.wallet-option.active');
+    return active?.dataset.currency || 'USD';
+  }});
+
+  updateAdminWalletButtons();
   if (!initWallet.depositAuthBound) {
-    document.addEventListener('xython:auth-change', updateDepositButtonVisibility);
+    document.addEventListener('xython:auth-change', () => {
+      updateAdminWalletButtons();
+      syncWalletGrantsFromServer();
+    });
     initWallet.depositAuthBound = true;
   }
 
@@ -3083,6 +3222,157 @@ function initDepositModal({ getActiveCurrency }) {
   });
 }
 
+function initSendMoneyModal({ getActiveCurrency }) {
+  if (document.getElementById('sendMoneyModal')) return;
+
+  const modal = document.createElement('div');
+  modal.className = 'deposit-modal send-money-modal';
+  modal.id = 'sendMoneyModal';
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="deposit-overlay" id="sendMoneyOverlay"></div>
+    <div class="deposit-dialog" role="dialog" aria-modal="true" aria-labelledby="sendMoneyTitle">
+      <button class="deposit-close" id="sendMoneyClose" type="button" aria-label="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+      <h2 class="deposit-title" id="sendMoneyTitle">Send Money</h2>
+      <p class="deposit-subtitle">Transfer play money to a player (admin only)</p>
+
+      <label class="deposit-label" for="sendMoneyRecipient">Recipient username</label>
+      <input type="text" id="sendMoneyRecipient" class="deposit-input send-money-recipient" maxlength="16" autocomplete="off" placeholder="Player username">
+
+      <div class="deposit-currencies" id="sendMoneyCurrencies">
+        <button type="button" class="deposit-currency active" data-currency="USD">USD</button>
+        <button type="button" class="deposit-currency" data-currency="BTC">BTC</button>
+        <button type="button" class="deposit-currency" data-currency="ETH">ETH</button>
+        <button type="button" class="deposit-currency" data-currency="LTC">LTC</button>
+      </div>
+
+      <label class="deposit-label" for="sendMoneyAmount">Amount</label>
+      <div class="deposit-input-wrap">
+        <span class="deposit-input-icon" id="sendMoneyInputIcon">$</span>
+        <input type="number" id="sendMoneyAmount" class="deposit-input" min="0" step="0.01" placeholder="0.00">
+      </div>
+
+      <p class="deposit-error" id="sendMoneyError" hidden></p>
+      <p class="deposit-success" id="sendMoneySuccess" hidden></p>
+
+      <button type="button" class="deposit-submit send-money-submit" id="sendMoneySubmit">Send</button>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const overlay = document.getElementById('sendMoneyOverlay');
+  const closeBtn = document.getElementById('sendMoneyClose');
+  const recipientInput = document.getElementById('sendMoneyRecipient');
+  const amountInput = document.getElementById('sendMoneyAmount');
+  const currencyBtns = modal.querySelectorAll('.deposit-currency');
+  const inputIcon = document.getElementById('sendMoneyInputIcon');
+  const errorEl = document.getElementById('sendMoneyError');
+  const successEl = document.getElementById('sendMoneySuccess');
+  const submitBtn = document.getElementById('sendMoneySubmit');
+
+  let selectedCurrency = 'USD';
+
+  function selectCurrency(currency) {
+    selectedCurrency = currency;
+    currencyBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.currency === currency);
+    });
+    inputIcon.textContent = CURRENCY_ICONS[currency] || '$';
+    amountInput.step = currency === 'USD' ? '0.01' : '0.00000001';
+    errorEl.hidden = true;
+    successEl.hidden = true;
+  }
+
+  function closeSendMoneyModal() {
+    modal.hidden = true;
+    document.body.style.overflow = '';
+    errorEl.hidden = true;
+    successEl.hidden = true;
+  }
+
+  window.openSendMoneyModal = function openSendMoneyModal() {
+    if (!canDeposit()) return;
+    selectCurrency(getActiveCurrency());
+    recipientInput.value = '';
+    amountInput.value = '';
+    errorEl.hidden = true;
+    successEl.hidden = true;
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    recipientInput.focus();
+  };
+
+  overlay.addEventListener('click', closeSendMoneyModal);
+  closeBtn.addEventListener('click', closeSendMoneyModal);
+
+  currencyBtns.forEach(btn => {
+    btn.addEventListener('click', () => selectCurrency(btn.dataset.currency));
+  });
+
+  submitBtn.addEventListener('click', async () => {
+    if (!canDeposit()) return;
+
+    const recipient = recipientInput.value.trim();
+    const amount = parseFloat(amountInput.value);
+    const userError = validateUsername(recipient);
+
+    errorEl.hidden = true;
+    successEl.hidden = true;
+
+    if (userError) {
+      errorEl.textContent = userError;
+      errorEl.hidden = false;
+      recipientInput.focus();
+      return;
+    }
+
+    if (!amount || amount <= 0) {
+      errorEl.textContent = 'Enter a valid amount';
+      errorEl.hidden = false;
+      amountInput.focus();
+      return;
+    }
+
+    if (recipient.toLowerCase() === getLoggedInUsername()?.toLowerCase()) {
+      errorEl.textContent = "Use Deposit to add money to your own account";
+      errorEl.hidden = false;
+      return;
+    }
+
+    submitBtn.disabled = true;
+    const result = await postWalletAction({
+      action: 'send',
+      admin: getLoggedInUsername(),
+      to: recipient,
+      amount,
+      currency: selectedCurrency,
+    });
+    submitBtn.disabled = false;
+
+    if (!result?.ok) {
+      errorEl.textContent = result?.data?.error || 'Could not send money. Try again.';
+      errorEl.hidden = false;
+      return;
+    }
+
+    const display = selectedCurrency === 'USD'
+      ? `$${formatWalletDisplay(selectedCurrency, amount)}`
+      : `${formatWalletDisplay(selectedCurrency, amount)} ${selectedCurrency}`;
+
+    successEl.textContent = `Sent ${display} to ${recipient}!`;
+    successEl.hidden = false;
+    recipientInput.value = '';
+    amountInput.value = '';
+
+    setTimeout(closeSendMoneyModal, 1800);
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !modal.hidden) closeSendMoneyModal();
+  });
+}
+
 function initVaultModal({ getActiveCurrency }) {
   if (document.getElementById('vaultModal')) return;
 
@@ -3305,11 +3595,13 @@ function initCommon() {
   initChat();
   startLeaderboardPolling();
   startAffiliatePolling();
+  startWalletGrantsPolling();
   syncCurrentUserToServer();
   if (!initCommon.affiliateAuthBound) {
     document.addEventListener('xython:auth-change', () => {
       syncCurrentUserToServer();
       startAffiliatePolling();
+      startWalletGrantsPolling();
     });
     initCommon.affiliateAuthBound = true;
   }

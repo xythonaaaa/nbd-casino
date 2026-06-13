@@ -813,6 +813,31 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const payload = JSON.parse(body || '{}');
+
+        if (payload.action === 'delete-message') {
+          if (!isWalletAdmin(payload.admin)) {
+            sendJson(res, 403, { error: 'Admin only' });
+            return;
+          }
+
+          const messageId = String(payload.messageId || '').trim();
+          if (!messageId) {
+            sendJson(res, 400, { error: 'Invalid message id' });
+            return;
+          }
+
+          const messages = loadMessages();
+          const filtered = messages.filter(m => m.id !== messageId);
+          if (filtered.length === messages.length) {
+            sendJson(res, 404, { error: 'Message not found' });
+            return;
+          }
+
+          saveMessages(filtered);
+          sendJson(res, 200, { ok: true, messages: filtered });
+          return;
+        }
+
         const text = String(payload.text || '').trim().slice(0, 240);
         const user = String(payload.user || '').trim().slice(0, 16);
         if (!text || !user) {

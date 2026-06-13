@@ -1,6 +1,12 @@
 import { getStore } from '@netlify/blobs';
 
 const MAX_MESSAGES = 200;
+const ADMIN_USERNAMES = ['ceo'];
+
+function isAdmin(username) {
+  const name = String(username || '').trim().toLowerCase();
+  return ADMIN_USERNAMES.some(u => u.toLowerCase() === name);
+}
 
 export default async (req) => {
   const store = getStore('nbd-chat');
@@ -18,6 +24,27 @@ export default async (req) => {
       payload = await req.json();
     } catch {
       return Response.json({ error: 'Bad request' }, { status: 400 });
+    }
+
+    if (payload.action === 'delete-message') {
+      if (!isAdmin(payload.admin)) {
+        return Response.json({ error: 'Admin only' }, { status: 403 });
+      }
+
+      const messageId = String(payload.messageId || '').trim();
+      if (!messageId) {
+        return Response.json({ error: 'Invalid message id' }, { status: 400 });
+      }
+
+      const existing = (await store.get('messages', { type: 'json' })) || [];
+      const messages = Array.isArray(existing) ? existing : [];
+      const filtered = messages.filter(m => m.id !== messageId);
+      if (filtered.length === messages.length) {
+        return Response.json({ error: 'Message not found' }, { status: 404 });
+      }
+
+      await store.setJSON('messages', filtered);
+      return Response.json({ ok: true, messages: filtered });
     }
 
     const text = String(payload.text || '').trim().slice(0, 240);

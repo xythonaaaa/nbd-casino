@@ -506,6 +506,41 @@ async function postChatToServer(username, text) {
   }
 }
 
+async function deleteChatMessageFromServer(messageId, admin) {
+  const url = getChatApiUrl();
+  if (!url) return null;
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete-message', admin, messageId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, data };
+  } catch {
+    return null;
+  }
+}
+
+async function deleteChatMessage(messageId) {
+  if (!messageId || !isAdmin()) return false;
+
+  if (getChatApiUrl()) {
+    const result = await deleteChatMessageFromServer(messageId, getLoggedInUsername());
+    if (result?.ok) {
+      await refreshChatMessages();
+      return true;
+    }
+    if (result !== null) return false;
+  }
+
+  const messages = loadChatMessagesLocal().filter(m => m.id !== messageId);
+  saveChatMessages(messages);
+  renderChat();
+  return true;
+}
+
 function loadChatMessages() {
   return chatCache.length ? chatCache : loadChatMessagesLocal();
 }
@@ -581,9 +616,13 @@ function renderChatMessages(container) {
     container.innerHTML = `<p class="chat-empty">${getChatEmptyMessage()}</p>`;
     return;
   }
-  container.innerHTML = messages.map(msg =>
-    `<div class="chat-msg"><span class="chat-user">${escapeHtml(msg.user)}:</span><span class="chat-text">${escapeHtml(msg.text)}</span></div>`
-  ).join('');
+  const showDelete = isAdmin();
+  container.innerHTML = messages.map(msg => {
+    const deleteBtn = showDelete && msg.id
+      ? `<button type="button" class="chat-delete-btn" data-message-id="${escapeHtml(msg.id)}" aria-label="Delete message" title="Delete message">&times;</button>`
+      : '';
+    return `<div class="chat-msg"><div class="chat-msg-body"><span class="chat-user">${escapeHtml(msg.user)}:</span><span class="chat-text">${escapeHtml(msg.text)}</span></div>${deleteBtn}</div>`;
+  }).join('');
   container.scrollTop = container.scrollHeight;
 }
 
@@ -608,9 +647,27 @@ function initChatSync() {
     if (e.key === CHAT_STORAGE_KEY && !chatUsingServer) refreshChatMessages();
   });
   document.addEventListener('xython:chat-change', renderChat);
-  document.addEventListener('xython:auth-change', updateChatInputState);
+  document.addEventListener('xython:auth-change', () => {
+    updateChatInputState();
+    renderChat();
+  });
   getChatChannel()?.addEventListener('message', () => {
     if (!chatUsingServer) refreshChatMessages();
+  });
+
+  document.addEventListener('click', async e => {
+    const btn = e.target.closest('.chat-delete-btn');
+    if (!btn || !isAdmin()) return;
+
+    const messageId = btn.dataset.messageId || '';
+    if (!messageId) return;
+
+    const confirmed = window.confirm('Delete this chat message?');
+    if (!confirmed) return;
+
+    btn.disabled = true;
+    await deleteChatMessage(messageId);
+    btn.disabled = false;
   });
 }
 

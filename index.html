@@ -10,6 +10,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/casino-home.css">
+  <!-- Critical homepage metrics layout — survives partial CSS deploy -->
+  <style>
+    .home-hero-stack{display:flex;flex-direction:column;gap:12px;margin-bottom:24px}
+    .casino-jackpot-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .home-hero-stack .live-wins{margin-bottom:0}
+    @media(max-width:768px){.casino-jackpot-bar{grid-template-columns:1fr}}
+  </style>
 </head>
 <body data-page="casino">
   <div class="app">

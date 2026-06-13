@@ -1087,9 +1087,18 @@ async function checkReferrerExists(code) {
       const res = await fetch(`${url}?exists=${encodeURIComponent(trimmed)}`);
       if (res.ok) {
         const data = await res.json();
-        return !!data.exists;
+        if (data.exists) return true;
+        if (isRegisteredUser(trimmed)) {
+          await registerUserOnServer(trimmed);
+          const retry = await fetch(`${url}?exists=${encodeURIComponent(trimmed)}`);
+          if (retry.ok) {
+            const retryData = await retry.json();
+            return !!retryData.exists;
+          }
+        }
+        return false;
       }
-    } catch { /* fall through */ }
+    } catch { /* fall through to local */ }
   }
   return isRegisteredUser(trimmed);
 }
@@ -1235,7 +1244,7 @@ async function createAccount(username, password) {
   };
   saveAccounts(accounts);
   markUserRegistered(username);
-  registerUserOnServer(username);
+  await registerUserOnServer(username);
 }
 
 function backfillRegisteredUsers() {
@@ -1306,9 +1315,10 @@ function clearPendingReferralCode() {
 
 function getUserReferrer(username) {
   const name = username || getLoggedInUsername();
-  if (affiliateUsingServer && name) {
+  if (affiliateUsingServer && name && getAffiliateApiUrl()) {
     const cached = affiliateCache[name.toLowerCase()];
-    if (cached?.referrer) return cached.referrer;
+    if (cached) return cached.referrer || null;
+    return null;
   }
   const store = loadAffiliateStore();
   const key = (name || '').toLowerCase();
@@ -1407,7 +1417,7 @@ function saveAffiliateStore(store) {
 
 function getAffiliateData(username) {
   const name = username || getLoggedInUsername();
-  if (affiliateUsingServer && name) {
+  if (affiliateUsingServer && name && getAffiliateApiUrl()) {
     const cached = affiliateCache[name.toLowerCase()];
     if (cached) {
       return {
@@ -1417,6 +1427,7 @@ function getAffiliateData(username) {
         referrals: [...(cached.referrals || [])],
       };
     }
+    return defaultAffiliateData();
   }
   return getAffiliateDataLocal(name);
 }
@@ -1500,10 +1511,12 @@ async function linkReferral(newUsername, referrerRaw) {
 
   const url = getAffiliateApiUrl();
   if (url) {
+    await registerUserOnServer(newUser);
+    await registerUserOnServer(referrer);
+
     const result = await postAffiliateAction({ action: 'link', newUser, referrer: code });
     if (result?.ok) {
       clearPendingReferralCode();
-      await registerUserOnServer(newUser);
       await refreshAffiliateData(newUser);
       await refreshAffiliateData(referrer);
       document.dispatchEvent(new CustomEvent('xython:affiliate-change'));
@@ -1555,7 +1568,11 @@ function accrueAffiliateCommission(wageredAmount) {
   const amount = parseFloat(wageredAmount) || 0;
   if (!username || amount <= 0) return;
 
-  postAffiliateAction({ action: 'wager', username, amount });
+  postAffiliateAction({ action: 'wager', username, amount }).then(result => {
+    if (!result?.ok) return;
+    const referrer = loadAffiliateStore().referralMap[username.toLowerCase()];
+    if (referrer) refreshAffiliateData(referrer);
+  });
 }
 
 function getReferralLink(username) {
@@ -2425,11 +2442,11 @@ function initAuthModal() {
 
     saveUser(username);
     notifyAuthChange();
-    syncCurrentUserToServer();
+    await syncCurrentUserToServer();
     if (!getUserReferrer(username)) {
       const affCode = getPendingReferralCode().trim();
       if (affCode && affCode.toLowerCase() !== username.toLowerCase()) {
-        linkReferral(username, affCode);
+        await linkReferral(username, affCode);
       }
     }
     successEl.textContent = `Welcome back, ${username}!`;

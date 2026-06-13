@@ -87,6 +87,22 @@ async function fetchAdminPlayers() {
   }
 }
 
+async function postAdminPlayersAction(payload) {
+  const url = getAdminPlayersApiUrl();
+  if (!url) return null;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  } catch {
+    return null;
+  }
+}
+
 function formatAdminUsd(value) {
   const n = parseFloat(value) || 0;
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -3566,10 +3582,11 @@ function initAdminPanelModal() {
                 <th>Profit</th>
                 <th>Referrer</th>
                 <th>Joined</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="adminPanelPlayersBody">
-              <tr><td colspan="8" class="admin-panel-players-empty">Loading…</td></tr>
+              <tr><td colspan="9" class="admin-panel-players-empty">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -3622,7 +3639,7 @@ function initAdminPanelModal() {
       : `${rows.length} of ${adminPlayersCache.length}`;
 
     if (!rows.length) {
-      playersBody.innerHTML = `<tr><td colspan="8" class="admin-panel-players-empty">${q ? 'No players match your search.' : 'No registered players yet.'}</td></tr>`;
+      playersBody.innerHTML = `<tr><td colspan="9" class="admin-panel-players-empty">${q ? 'No players match your search.' : 'No registered players yet.'}</td></tr>`;
       return;
     }
 
@@ -3630,6 +3647,10 @@ function initAdminPanelModal() {
       const usd = formatAdminUsd(p.grants?.USD || 0);
       const profit = p.profit || 0;
       const profitClass = profit > 0 ? 'admin-panel-profit--pos' : profit < 0 ? 'admin-panel-profit--neg' : '';
+      const canDelete = !isAdmin(p.username);
+      const deleteBtn = canDelete
+        ? `<button type="button" class="admin-panel-delete-btn" data-username="${escapeHtml(p.username)}" title="Delete player">Delete</button>`
+        : '';
       return `<tr>
         <td class="admin-panel-player-name">${escapeHtml(p.username)}</td>
         <td>${usd}</td>
@@ -3639,6 +3660,7 @@ function initAdminPanelModal() {
         <td class="${profitClass}">${formatAdminUsd(profit)}</td>
         <td>${p.referrer ? escapeHtml(p.referrer) : '—'}</td>
         <td>${formatAdminDate(p.joinedAt)}</td>
+        <td class="admin-panel-player-actions">${deleteBtn}</td>
       </tr>`;
     }).join('');
   }
@@ -3649,12 +3671,12 @@ function initAdminPanelModal() {
     mainSections.forEach(el => { el.hidden = true; });
     playersView.hidden = false;
     dialog?.classList.add('admin-panel-dialog--wide');
-    playersBody.innerHTML = '<tr><td colspan="8" class="admin-panel-players-empty">Loading…</td></tr>';
+    playersBody.innerHTML = '<tr><td colspan="9" class="admin-panel-players-empty">Loading…</td></tr>';
     playersCount.textContent = '';
 
     const result = await fetchAdminPlayers();
     if (!result?.ok) {
-      playersBody.innerHTML = `<tr><td colspan="8" class="admin-panel-players-empty">${escapeHtml(result?.data?.error || 'Could not load players.')}</td></tr>`;
+      playersBody.innerHTML = `<tr><td colspan="9" class="admin-panel-players-empty">${escapeHtml(result?.data?.error || 'Could not load players.')}</td></tr>`;
       return;
     }
 
@@ -3688,6 +3710,38 @@ function initAdminPanelModal() {
 
   playersBackBtn.addEventListener('click', showAdminMainView);
   playersSearch.addEventListener('input', () => renderAdminPlayersTable(playersSearch.value));
+
+  playersBody.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.admin-panel-delete-btn');
+    if (!btn || !isAdmin()) return;
+
+    const username = btn.dataset.username || '';
+    if (!username || isAdmin(username)) return;
+
+    const confirmed = window.confirm(
+      `Permanently delete ${username}?\n\nThis removes their wallet, affiliate records, leaderboard history, and chat messages. This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    btn.disabled = true;
+    const result = await postAdminPlayersAction({
+      action: 'delete-player',
+      admin: getLoggedInUsername(),
+      username,
+    });
+    btn.disabled = false;
+
+    if (!result?.ok) {
+      errorEl.textContent = result?.data?.error || 'Could not delete player. Try again.';
+      errorEl.hidden = false;
+      return;
+    }
+
+    adminPlayersCache = Array.isArray(result.data?.players) ? result.data.players : [];
+    renderAdminPlayersTable(playersSearch.value);
+    successEl.textContent = `${username} deleted from all stores.`;
+    successEl.hidden = false;
+  });
 
   sendBtn.addEventListener('click', () => {
     if (!isAdmin()) return;

@@ -428,6 +428,135 @@ function aggregateLeaderboardPlayerStats(leaderboard) {
   return stats;
 }
 
+function usernameMatchesPlayer(name, keys) {
+  return keys.has(walletUserKey(name));
+}
+
+function parseDeletePlayerTargets(payload) {
+  const raw = [];
+  if (Array.isArray(payload.usernames)) raw.push(...payload.usernames);
+  if (payload.username) raw.push(payload.username);
+  const keys = new Set();
+  const names = [];
+  for (const name of raw) {
+    const trimmed = String(name || '').trim().slice(0, 16);
+    if (!trimmed) continue;
+    const key = walletUserKey(trimmed);
+    if (isWalletAdmin(trimmed)) continue;
+    if (!keys.has(key)) {
+      keys.add(key);
+      names.push(trimmed);
+    }
+  }
+  return { keys, names };
+}
+
+function removePlayersFromWalletStore(wallet, keys) {
+  const removed = { users: [], grants: [], userMeta: [] };
+  wallet.users = wallet.users.filter(u => {
+    if (usernameMatchesPlayer(u, keys)) {
+      removed.users.push(u);
+      return false;
+    }
+    return true;
+  });
+  for (const key of keys) {
+    if (wallet.grants[key]) {
+      removed.grants.push(key);
+      delete wallet.grants[key];
+    }
+    if (wallet.userMeta[key]) {
+      removed.userMeta.push(key);
+      delete wallet.userMeta[key];
+    }
+  }
+  return removed;
+}
+
+function removePlayersFromAffiliateStore(affiliates, keys) {
+  const removed = { users: [], referralMap: [], affiliates: [], referrals: [] };
+
+  affiliates.users = affiliates.users.filter(u => {
+    if (usernameMatchesPlayer(u, keys)) {
+      removed.users.push(u);
+      return false;
+    }
+    return true;
+  });
+
+  for (const refUserKey of Object.keys(affiliates.referralMap)) {
+    const referrer = affiliates.referralMap[refUserKey];
+    if (keys.has(refUserKey) || usernameMatchesPlayer(referrer, keys)) {
+      removed.referralMap.push({ user: refUserKey, referrer });
+      delete affiliates.referralMap[refUserKey];
+    }
+  }
+
+  for (const affKey of Object.keys(affiliates.affiliates)) {
+    if (usernameMatchesPlayer(affKey, keys)) {
+      removed.affiliates.push(affKey);
+      delete affiliates.affiliates[affKey];
+    }
+  }
+
+  for (const [affKey, affData] of Object.entries(affiliates.affiliates)) {
+    if (!Array.isArray(affData?.referrals)) continue;
+    affData.referrals = affData.referrals.filter(r => {
+      if (usernameMatchesPlayer(r.username, keys)) {
+        removed.referrals.push({ affiliate: affKey, username: r.username });
+        return false;
+      }
+      return true;
+    });
+  }
+
+  return removed;
+}
+
+function removePlayersFromLeaderboardStore(leaderboard, keys) {
+  const removed = { wins: 0, recentBets: 0 };
+  const beforeWins = leaderboard.wins.length;
+  leaderboard.wins = leaderboard.wins.filter(w => !usernameMatchesPlayer(w.user, keys));
+  removed.wins = beforeWins - leaderboard.wins.length;
+
+  const beforeBets = leaderboard.recentBets.length;
+  leaderboard.recentBets = leaderboard.recentBets.filter(b => !usernameMatchesPlayer(b.user, keys));
+  removed.recentBets = beforeBets - leaderboard.recentBets.length;
+
+  return removed;
+}
+
+function removePlayersFromChatStore(keys) {
+  const messages = loadMessages();
+  const before = messages.length;
+  const filtered = messages.filter(m => !usernameMatchesPlayer(m.user, keys));
+  saveMessages(filtered);
+  return { messages: before - filtered.length };
+}
+
+function deletePlayersFromAllStores(payload) {
+  const { keys, names } = parseDeletePlayerTargets(payload);
+  if (!names.length) return { error: 'No valid usernames to delete' };
+
+  const wallet = loadWalletStore();
+  const affiliates = loadAffiliateStore();
+  const leaderboard = loadLeaderboard();
+
+  const removed = {
+    wallet: removePlayersFromWalletStore(wallet, keys),
+    affiliates: removePlayersFromAffiliateStore(affiliates, keys),
+    leaderboard: removePlayersFromLeaderboardStore(leaderboard, keys),
+    chat: removePlayersFromChatStore(keys),
+  };
+
+  saveWalletStore(wallet);
+  saveAffiliateStore(affiliates);
+  saveLeaderboard(leaderboard);
+
+  const players = buildAdminPlayersList();
+  return { ok: true, deleted: names, removed, count: players.length, players };
+}
+
 function buildAdminPlayersList() {
   const wallet = loadWalletStore();
   const affiliates = loadAffiliateStore();
@@ -491,6 +620,17 @@ function handleAdminPlayersRequest(req, res, urlPath) {
           sendJson(res, 403, { error: 'Admin only' });
           return;
         }
+
+        if (payload.action === 'delete-player') {
+          const result = deletePlayersFromAllStores(payload);
+          if (result.error) {
+            sendJson(res, 400, result);
+            return;
+          }
+          sendJson(res, 200, result);
+          return;
+        }
+
         const players = buildAdminPlayersList();
         sendJson(res, 200, { ok: true, count: players.length, players });
       } catch {

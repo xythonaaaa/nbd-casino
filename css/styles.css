@@ -1351,6 +1351,33 @@ input {
   color: var(--text-primary);
 }
 
+.admin-panel-player-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.admin-panel-delete-btn {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 6px;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.admin-panel-delete-btn:hover:not(:disabled) {
+  color: #fff;
+  background: rgba(239, 68, 68, 0.35);
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
+.admin-panel-delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .admin-panel-players-empty {
   text-align: center;
   color: var(--text-muted);

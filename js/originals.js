@@ -5,9 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const countEl = document.getElementById('gameCount');
   if (countEl) countEl.textContent = `${GAMES.originals.length} games`;
 
-  renderLiveWins(GAMES.originals);
+  renderLiveWins();
   document.addEventListener('xython:leaderboard-change', () => {
-    renderLiveWins(GAMES.originals);
+    renderLiveWins();
   });
 
   const search = document.getElementById('gameSearch');
@@ -20,8 +20,4 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
-
-  renderBets(GAMES.originals);
-  renderChat();
-  setInterval(() => renderBets(GAMES.originals), 15000);
 });

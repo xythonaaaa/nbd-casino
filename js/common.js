@@ -65,6 +65,40 @@ async function postLeaderboardAction(payload) {
   }
 }
 
+function getAdminPlayersApiUrl() {
+  if (window.NBD_ADMIN_PLAYERS_API) return window.NBD_ADMIN_PLAYERS_API;
+  if (location.protocol === 'http:' || location.protocol === 'https:') {
+    return `${location.origin}/api/admin-players`;
+  }
+  return null;
+}
+
+async function fetchAdminPlayers() {
+  const url = getAdminPlayersApiUrl();
+  if (!url || !isAdmin()) return null;
+  try {
+    const admin = encodeURIComponent(getLoggedInUsername());
+    const res = await fetch(`${url}?admin=${admin}`, { cache: 'no-store' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, data };
+    return { ok: true, data };
+  } catch {
+    return null;
+  }
+}
+
+function formatAdminUsd(value) {
+  const n = parseFloat(value) || 0;
+  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatAdminDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 async function registerUserOnWalletServer(username) {
   const result = await postWalletAction({ action: 'register', username });
   return !!result?.ok;
@@ -3474,6 +3508,13 @@ function initAdminPanelModal() {
       <p class="deposit-subtitle">Site management tools (admin only)</p>
 
       <div class="admin-panel-actions">
+        <button type="button" class="admin-panel-btn admin-panel-btn--primary" id="adminPanelViewPlayers">
+          <span class="admin-panel-btn-icon">${userMenuIcon('affiliates')}</span>
+          <span class="admin-panel-btn-text">
+            <span class="admin-panel-btn-label">View Players</span>
+            <span class="admin-panel-btn-desc">Browse registered players and stats</span>
+          </span>
+        </button>
         <button type="button" class="admin-panel-btn admin-panel-btn--primary" id="adminPanelSendMoney">
           <span class="admin-panel-btn-icon">${userMenuIcon('transactions')}</span>
           <span class="admin-panel-btn-text">
@@ -3503,6 +3544,37 @@ function initAdminPanelModal() {
         <button type="button" class="deposit-submit admin-panel-reset-player-btn" id="adminPanelResetPlayer">Reset Player</button>
       </div>
 
+      <div class="admin-panel-players" id="adminPanelPlayersView" hidden>
+        <div class="admin-panel-players-header">
+          <button type="button" class="admin-panel-back-btn" id="adminPanelPlayersBack" aria-label="Back to admin tools">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            Back
+          </button>
+          <span class="admin-panel-players-count" id="adminPanelPlayersCount"></span>
+        </div>
+        <label class="deposit-label" for="adminPanelPlayersSearch">Search players</label>
+        <input type="search" id="adminPanelPlayersSearch" class="deposit-input admin-panel-players-search" maxlength="16" autocomplete="off" placeholder="Filter by username">
+        <div class="admin-panel-players-table-wrap">
+          <table class="admin-panel-players-table">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>USD</th>
+                <th>Bets</th>
+                <th>Wagered</th>
+                <th>Wins</th>
+                <th>Profit</th>
+                <th>Referrer</th>
+                <th>Joined</th>
+              </tr>
+            </thead>
+            <tbody id="adminPanelPlayersBody">
+              <tr><td colspan="8" class="admin-panel-players-empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <p class="deposit-error" id="adminPanelError" hidden></p>
       <p class="deposit-success" id="adminPanelSuccess" hidden></p>
     </div>`;
@@ -3510,6 +3582,7 @@ function initAdminPanelModal() {
 
   const overlay = document.getElementById('adminPanelOverlay');
   const closeBtn = document.getElementById('adminPanelClose');
+  const viewPlayersBtn = document.getElementById('adminPanelViewPlayers');
   const sendBtn = document.getElementById('adminPanelSendMoney');
   const resetBalancesBtn = document.getElementById('adminPanelResetBalances');
   const resetLeaderboardsBtn = document.getElementById('adminPanelResetLeaderboards');
@@ -3517,27 +3590,104 @@ function initAdminPanelModal() {
   const resetPlayerBtn = document.getElementById('adminPanelResetPlayer');
   const errorEl = document.getElementById('adminPanelError');
   const successEl = document.getElementById('adminPanelSuccess');
+  const playersView = document.getElementById('adminPanelPlayersView');
+  const playersBackBtn = document.getElementById('adminPanelPlayersBack');
+  const playersSearch = document.getElementById('adminPanelPlayersSearch');
+  const playersBody = document.getElementById('adminPanelPlayersBody');
+  const playersCount = document.getElementById('adminPanelPlayersCount');
+  const mainSections = modal.querySelectorAll('.admin-panel-actions, .admin-panel-section:not(.admin-panel-players)');
+  const dialog = modal.querySelector('.admin-panel-dialog');
+  let adminPlayersCache = [];
 
   function clearAdminPanelMessages() {
     errorEl.hidden = true;
     successEl.hidden = true;
   }
 
+  function showAdminMainView() {
+    mainSections.forEach(el => { el.hidden = false; });
+    playersView.hidden = true;
+    dialog?.classList.remove('admin-panel-dialog--wide');
+    playersSearch.value = '';
+  }
+
+  function renderAdminPlayersTable(filter = '') {
+    const q = filter.trim().toLowerCase();
+    const rows = adminPlayersCache.filter(p =>
+      !q || p.username.toLowerCase().includes(q)
+    );
+
+    playersCount.textContent = rows.length === adminPlayersCache.length
+      ? `${adminPlayersCache.length} player${adminPlayersCache.length === 1 ? '' : 's'}`
+      : `${rows.length} of ${adminPlayersCache.length}`;
+
+    if (!rows.length) {
+      playersBody.innerHTML = `<tr><td colspan="8" class="admin-panel-players-empty">${q ? 'No players match your search.' : 'No registered players yet.'}</td></tr>`;
+      return;
+    }
+
+    playersBody.innerHTML = rows.map(p => {
+      const usd = formatAdminUsd(p.grants?.USD || 0);
+      const profit = p.profit || 0;
+      const profitClass = profit > 0 ? 'admin-panel-profit--pos' : profit < 0 ? 'admin-panel-profit--neg' : '';
+      return `<tr>
+        <td class="admin-panel-player-name">${escapeHtml(p.username)}</td>
+        <td>${usd}</td>
+        <td>${p.bets || 0}</td>
+        <td>${formatAdminUsd(p.wagered || 0)}</td>
+        <td>${p.wins || 0}</td>
+        <td class="${profitClass}">${formatAdminUsd(profit)}</td>
+        <td>${p.referrer ? escapeHtml(p.referrer) : '—'}</td>
+        <td>${formatAdminDate(p.joinedAt)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function openAdminPlayersView() {
+    if (!isAdmin()) return;
+    clearAdminPanelMessages();
+    mainSections.forEach(el => { el.hidden = true; });
+    playersView.hidden = false;
+    dialog?.classList.add('admin-panel-dialog--wide');
+    playersBody.innerHTML = '<tr><td colspan="8" class="admin-panel-players-empty">Loading…</td></tr>';
+    playersCount.textContent = '';
+
+    const result = await fetchAdminPlayers();
+    if (!result?.ok) {
+      playersBody.innerHTML = `<tr><td colspan="8" class="admin-panel-players-empty">${escapeHtml(result?.data?.error || 'Could not load players.')}</td></tr>`;
+      return;
+    }
+
+    adminPlayersCache = Array.isArray(result.data?.players) ? result.data.players : [];
+    renderAdminPlayersTable();
+    playersSearch.focus();
+  }
+
   function closeAdminPanelModal() {
     modal.hidden = true;
     document.body.style.overflow = '';
     clearAdminPanelMessages();
+    showAdminMainView();
   }
 
   window.openAdminPanelModal = function openAdminPanelModal() {
     if (!isAdmin()) return;
     clearAdminPanelMessages();
+    showAdminMainView();
     modal.hidden = false;
     document.body.style.overflow = 'hidden';
   };
 
   overlay.addEventListener('click', closeAdminPanelModal);
   closeBtn.addEventListener('click', closeAdminPanelModal);
+
+  viewPlayersBtn.addEventListener('click', () => {
+    if (!isAdmin()) return;
+    openAdminPlayersView();
+  });
+
+  playersBackBtn.addEventListener('click', showAdminMainView);
+  playersSearch.addEventListener('input', () => renderAdminPlayersTable(playersSearch.value));
 
   sendBtn.addEventListener('click', () => {
     if (!isAdmin()) return;

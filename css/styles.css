@@ -1261,6 +1261,110 @@ input {
   filter: brightness(1.08);
 }
 
+.admin-panel-dialog--wide {
+  max-width: min(920px, calc(100vw - 32px));
+}
+
+.admin-panel-players {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.admin-panel-players-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 10px;
+}
+
+.admin-panel-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: background var(--transition), color var(--transition);
+}
+
+.admin-panel-back-btn:hover {
+  color: var(--text-primary);
+  background: rgba(147, 51, 234, 0.12);
+  border-color: rgba(147, 51, 234, 0.35);
+}
+
+.admin-panel-players-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.admin-panel-players-search {
+  margin-bottom: 10px;
+}
+
+.admin-panel-players-table-wrap {
+  max-height: min(52vh, 420px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.admin-panel-players-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.admin-panel-players-table th,
+.admin-panel-players-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
+}
+
+.admin-panel-players-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: rgba(20, 12, 35, 0.98);
+}
+
+.admin-panel-players-table tbody tr:hover {
+  background: rgba(147, 51, 234, 0.08);
+}
+
+.admin-panel-player-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.admin-panel-players-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 24px 12px !important;
+}
+
+.admin-panel-profit--pos {
+  color: #86efac;
+}
+
+.admin-panel-profit--neg {
+  color: #fca5a5;
+}
+
 .vault-balances {
   display: grid;
   grid-template-columns: 1fr 1fr;

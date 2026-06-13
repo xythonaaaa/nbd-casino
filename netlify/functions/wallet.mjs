@@ -9,7 +9,7 @@ function defaultBalances() {
 }
 
 function defaultStore() {
-  return { users: [], grants: {}, resetAt: 0 };
+  return { users: [], grants: {}, userMeta: {}, resetAt: 0 };
 }
 
 function normalizeStore(raw) {
@@ -17,6 +17,7 @@ function normalizeStore(raw) {
   return {
     users: Array.isArray(data.users) ? data.users : [],
     grants: data.grants && typeof data.grants === 'object' ? data.grants : {},
+    userMeta: data.userMeta && typeof data.userMeta === 'object' ? data.userMeta : {},
     resetAt: Math.max(0, parseInt(data.resetAt, 10) || 0),
   };
 }
@@ -62,7 +63,12 @@ function userExists(store, username) {
 function ensureUser(store, username) {
   const name = String(username || '').trim().slice(0, 16);
   if (!name) return null;
-  if (!userExists(store, name)) store.users.push(name);
+  const key = userKey(name);
+  if (!userExists(store, name)) {
+    store.users.push(name);
+    if (!store.userMeta) store.userMeta = {};
+    if (!store.userMeta[key]) store.userMeta[key] = { registeredAt: Date.now() };
+  }
   return name;
 }
 

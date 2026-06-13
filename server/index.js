@@ -298,7 +298,7 @@ function defaultWalletBalances() {
 }
 
 function defaultWalletStore() {
-  return { users: [], grants: {}, resetAt: 0 };
+  return { users: [], grants: {}, userMeta: {}, resetAt: 0 };
 }
 
 function loadWalletStore() {
@@ -307,6 +307,7 @@ function loadWalletStore() {
     return {
       users: Array.isArray(parsed.users) ? parsed.users : [],
       grants: parsed.grants && typeof parsed.grants === 'object' ? parsed.grants : {},
+      userMeta: parsed.userMeta && typeof parsed.userMeta === 'object' ? parsed.userMeta : {},
       resetAt: Math.max(0, parseInt(parsed.resetAt, 10) || 0),
     };
   } catch {
@@ -332,7 +333,11 @@ function ensureWalletUser(store, username) {
   const name = String(username || '').trim().slice(0, 16);
   if (!name) return null;
   const key = walletUserKey(name);
-  if (!store.users.some(u => u.toLowerCase() === key)) store.users.push(name);
+  if (!store.users.some(u => u.toLowerCase() === key)) {
+    store.users.push(name);
+    if (!store.userMeta) store.userMeta = {};
+    if (!store.userMeta[key]) store.userMeta[key] = { registeredAt: Date.now() };
+  }
   return name;
 }
 
@@ -387,6 +392,115 @@ function resetOriginalsLeaderboard(data) {
   });
   data.recentBets = data.recentBets.filter(b => !ORIGINALS_GAMES.has(b.game));
   return data;
+}
+
+function findAffiliateJoinedAt(store, username) {
+  const key = walletUserKey(username);
+  for (const affData of Object.values(store.affiliates || {})) {
+    const referrals = affData?.referrals;
+    if (!Array.isArray(referrals)) continue;
+    const ref = referrals.find(r => walletUserKey(r.username) === key);
+    if (ref?.joinedAt) return ref.joinedAt;
+  }
+  return null;
+}
+
+function aggregateLeaderboardPlayerStats(leaderboard) {
+  const stats = {};
+  const touch = user => {
+    const key = walletUserKey(user);
+    if (!key || key === 'player') return null;
+    if (!stats[key]) stats[key] = { bets: 0, wagered: 0, wins: 0, payout: 0 };
+    return stats[key];
+  };
+
+  for (const bet of leaderboard.recentBets || []) {
+    const entry = touch(bet.user);
+    if (!entry) continue;
+    const betAmt = Math.max(0, parseFloat(bet.bet) || 0);
+    const payAmt = Math.max(0, parseFloat(bet.payout) || 0);
+    entry.bets += 1;
+    entry.wagered += betAmt;
+    entry.payout += payAmt;
+    if (bet.won) entry.wins += 1;
+  }
+
+  return stats;
+}
+
+function buildAdminPlayersList() {
+  const wallet = loadWalletStore();
+  const affiliates = loadAffiliateStore();
+  const leaderboard = loadLeaderboard();
+  const lbStats = aggregateLeaderboardPlayerStats(leaderboard);
+  const players = new Map();
+  const allUsers = new Set();
+
+  wallet.users.forEach(u => allUsers.add(resolveAffiliateUser(wallet.users, u)));
+  affiliates.users.forEach(u => allUsers.add(resolveAffiliateUser(affiliates.users, u)));
+
+  for (const username of allUsers) {
+    if (!username) continue;
+    const key = walletUserKey(username);
+    const stats = lbStats[key] || { bets: 0, wagered: 0, wins: 0, payout: 0 };
+    const joinedAt = wallet.userMeta[key]?.registeredAt
+      || findAffiliateJoinedAt(affiliates, username)
+      || null;
+    const referrerRaw = affiliates.referralMap[key] || null;
+    const referrer = referrerRaw ? resolveAffiliateUser(affiliates.users, referrerRaw) : null;
+
+    players.set(key, {
+      username,
+      grants: getWalletGrants(wallet, username),
+      referrer,
+      joinedAt,
+      bets: stats.bets,
+      wagered: Math.round(stats.wagered * 100) / 100,
+      wins: stats.wins,
+      payout: Math.round(stats.payout * 100) / 100,
+      profit: Math.round((stats.payout - stats.wagered) * 100) / 100,
+    });
+  }
+
+  return Array.from(players.values()).sort((a, b) =>
+    a.username.localeCompare(b.username, undefined, { sensitivity: 'base' })
+  );
+}
+
+function handleAdminPlayersRequest(req, res, urlPath) {
+  const query = new URL(`http://local${urlPath}`).searchParams;
+
+  if (req.method === 'GET') {
+    const admin = query.get('admin') || '';
+    if (!isWalletAdmin(admin)) {
+      sendJson(res, 403, { error: 'Admin only' });
+      return;
+    }
+    const players = buildAdminPlayersList();
+    sendJson(res, 200, { ok: true, count: players.length, players });
+    return;
+  }
+
+  if (req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        if (!isWalletAdmin(payload.admin)) {
+          sendJson(res, 403, { error: 'Admin only' });
+          return;
+        }
+        const players = buildAdminPlayersList();
+        sendJson(res, 200, { ok: true, count: players.length, players });
+      } catch {
+        sendJson(res, 400, { error: 'Bad request' });
+      }
+    });
+    return;
+  }
+
+  sendJson(res, 405, { error: 'Method not allowed' });
 }
 
 function handleWalletRequest(req, res, urlPath) {
@@ -621,6 +735,11 @@ const server = http.createServer((req, res) => {
 
   if (req.url.startsWith('/api/affiliates')) {
     handleAffiliatesRequest(req, res, req.url);
+    return;
+  }
+
+  if (req.url.startsWith('/api/admin-players')) {
+    handleAdminPlayersRequest(req, res, req.url);
     return;
   }
 

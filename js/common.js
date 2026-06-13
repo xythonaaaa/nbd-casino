@@ -138,6 +138,12 @@ function updateAdminWalletButtons() {
   document.querySelector('.header-wallet')?.classList.toggle('has-admin-actions', show);
 }
 
+function sitePath(path) {
+  const clean = String(path || '').replace(/^\//, '');
+  if (location.protocol === 'file:') return clean;
+  return `/${clean}`;
+}
+
 function updateDepositButtonVisibility() {
   updateAdminWalletButtons();
 }
@@ -1883,7 +1889,7 @@ function renderAuthUI() {
             <span class="header-user-name">${name}</span>
           </button>
           <div class="user-dropdown" id="userDropdown" hidden>
-            <a href="profile.html" class="user-dropdown-header" id="userProfileLink">
+            <a href="${sitePath('profile.html')}" class="user-dropdown-header" id="userProfileLink">
               ${avatarDropdown}
               <div class="user-dropdown-info">
                 <span class="user-dropdown-name">${name}</span>
@@ -2298,14 +2304,49 @@ function wireRewardsMenu() {
   }
 }
 
+function handleUserMenuAction(menu) {
+  switch (menu) {
+    case 'logout':
+      clearUser();
+      renderAuthUI();
+      return;
+    case 'settings':
+      window.location.href = sitePath('settings.html');
+      return;
+    case 'transactions':
+      window.location.href = sitePath('transactions.html');
+      return;
+    case 'vip':
+      window.location.href = sitePath('vip.html');
+      return;
+    case 'affiliates':
+      window.location.href = sitePath('affiliates.html');
+      return;
+    case 'vault':
+      if (!requireAuth('register')) return;
+      window.openVaultModal?.();
+      return;
+    case 'rewards':
+      openRewardsPopout();
+      return;
+    case 'support':
+      window.openLiveChat?.();
+      return;
+    case 'self-exclusion':
+      window.alert('Self exclusion is not enabled on this site.');
+      return;
+    case 'redeem':
+      window.alert('Redeem codes are not available yet.');
+      return;
+    default:
+      return;
+  }
+}
+
 function wireUserMenu() {
   const toggle = document.getElementById('headerUserToggle');
   const dropdown = document.getElementById('userDropdown');
   if (!toggle || !dropdown) return;
-
-  function closeUserMenu() {
-    closeUserPopout();
-  }
 
   toggle.addEventListener('click', e => {
     e.stopPropagation();
@@ -2320,52 +2361,20 @@ function wireUserMenu() {
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   });
 
-  dropdown.addEventListener('click', e => e.stopPropagation());
-
-  dropdown.querySelector('[data-menu="logout"]')?.addEventListener('click', () => {
-    clearUser();
-    closeUserMenu();
-    renderAuthUI();
-  });
-
-  dropdown.querySelector('[data-menu="settings"]')?.addEventListener('click', () => {
-    closeUserMenu();
-    window.location.href = 'settings.html';
-  });
-
-  dropdown.querySelector('[data-menu="transactions"]')?.addEventListener('click', () => {
-    closeUserMenu();
-    window.location.href = 'transactions.html';
-  });
-
-  dropdown.querySelector('[data-menu="vip"]')?.addEventListener('click', () => {
-    closeUserMenu();
-    window.location.href = 'vip.html';
-  });
-
-  dropdown.querySelector('[data-menu="vault"]')?.addEventListener('click', () => {
-    closeUserMenu();
-    if (!requireAuth('register')) return;
-    window.openVaultModal?.();
-  });
-
-  dropdown.querySelector('[data-menu="affiliates"]')?.addEventListener('click', () => {
-    closeUserMenu();
-    window.location.href = 'affiliates.html';
-  });
-
-  dropdown.querySelector('[data-menu="rewards"]')?.addEventListener('click', () => {
-    closeUserMenu();
-    openRewardsPopout();
-  });
-
-  dropdown.querySelector('[data-menu="support"]')?.addEventListener('click', () => {
-    closeUserMenu();
-    window.openLiveChat?.();
+  dropdown.addEventListener('click', e => {
+    e.stopPropagation();
+    const btn = e.target.closest('[data-menu]');
+    if (!btn) return;
+    e.preventDefault();
+    closeUserPopout();
+    handleUserMenuAction(btn.getAttribute('data-menu'));
   });
 
   if (!userMenuOutsideClickBound) {
-    document.addEventListener('click', () => closeUserPopout());
+    document.addEventListener('click', e => {
+      if (e.target.closest('.header-user-menu')) return;
+      closeUserPopout();
+    });
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') closeUserPopout();
     });
@@ -3573,7 +3582,7 @@ function initCasinoThemeLoader() {
 
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = 'css/casino-home.css';
+  link.href = sitePath('css/casino-home.css');
   link.dataset.casinoCss = '1';
   document.head.appendChild(link);
 }
@@ -3618,7 +3627,7 @@ function initGameInfoLoader() {
   if (!document.querySelector('link[data-gi-css]')) {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = 'css/game-info.css';
+    link.href = sitePath('css/game-info.css');
     link.dataset.giCss = '1';
     document.head.appendChild(link);
   }

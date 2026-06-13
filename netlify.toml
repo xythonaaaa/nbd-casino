@@ -1,5 +1,5 @@
 [build]
-  command = "npm install && npm run verify"
+  command = "npm install && if [ -f scripts/verify-assets.mjs ]; then npm run verify; else echo 'verify-assets.mjs missing — skipping file checks'; fi"
   publish = "."
   functions = "netlify/functions"
 

@@ -152,6 +152,7 @@ function buildPlayersList(wallet, affiliates, leaderboard) {
   );
 }
 
+export default async (req) => {
   if (req.method === 'GET') {
     const url = new URL(req.url);
     const admin = url.searchParams.get('admin') || '';

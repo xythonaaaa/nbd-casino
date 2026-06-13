@@ -129,9 +129,15 @@ function getAffiliatePayload(store, username) {
     const refKey = (resolveAffiliateUser(store.users, referrer) || referrer).toLowerCase();
     if (refKey !== affKey) return;
     const referredName = resolveAffiliateUser(store.users, userKey) || userKey;
-    if (!data.referrals.some(r => r.username.toLowerCase() === referredName.toLowerCase())) {
-      data.referrals.push({ username: referredName, joinedAt: Date.now(), wagered: 0 });
-    }
+    if (data.referrals.some(r => r.username.toLowerCase() === referredName.toLowerCase())) return;
+    const storedRef = entry?.data?.referrals?.find(
+      r => r.username.toLowerCase() === referredName.toLowerCase()
+    );
+    data.referrals.push({
+      username: referredName,
+      joinedAt: storedRef?.joinedAt || Date.now(),
+      wagered: storedRef?.wagered || 0,
+    });
   });
 
   return {

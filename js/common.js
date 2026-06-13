@@ -1,6 +1,7 @@
 const CHAT_STORAGE_KEY = 'nbd-chat-v1';
 const CHAT_MAX_MESSAGES = 200;
 const CHAT_MAX_LENGTH = 240;
+const CHAT_POLL_MS = 3000;
 
 const PANEL_STORAGE_KEY = 'xython-panel-open';
 const WALLET_STORAGE_KEY = 'xython-wallet';
@@ -162,11 +163,6 @@ function renderBets(gamePool) {
     </div>`;
   }).join('');
 }
-
-const CHAT_STORAGE_KEY = 'nbd-chat-v1';
-const CHAT_MAX_MESSAGES = 200;
-const CHAT_MAX_LENGTH = 240;
-const CHAT_POLL_MS = 3000;
 
 let chatCache = [];
 let chatUsingServer = false;

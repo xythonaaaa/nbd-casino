@@ -49,6 +49,22 @@ async function postWalletAction(payload) {
   }
 }
 
+async function postLeaderboardAction(payload) {
+  const url = getLeaderboardApiUrl();
+  if (!url) return null;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  } catch {
+    return null;
+  }
+}
+
 async function registerUserOnWalletServer(username) {
   const result = await postWalletAction({ action: 'register', username });
   return !!result?.ok;
@@ -1958,6 +1974,10 @@ function renderAuthUI() {
               ${userMenuItem('self-exclusion', 'Self Exclusion', userMenuIcon('lock'))}
               ${userMenuItem('support', 'Live Chat', userMenuIcon('support'))}
               ${userMenuItem('redeem', 'Redeem Code', userMenuIcon('redeem'))}
+              ${isAdmin(user.username) ? `
+              <div class="user-dropdown-divider"></div>
+              ${userMenuItem('admin-panel', 'Admin Panel', userMenuIcon('admin'), 'user-menu-item--admin')}
+              ` : ''}
               ${userMenuItem('logout', 'Logout', userMenuIcon('logout'), 'user-menu-item--logout')}
             </nav>
           </div>
@@ -1997,6 +2017,7 @@ function userMenuIcon(type) {
     lock: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>',
     support: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11a9 9 0 0118 0v4a2 2 0 01-2 2h-1v-5H6v5H5a2 2 0 01-2-2v-4z"/><path d="M8 21h8"/></svg>',
     redeem: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a2 2 0 012-2h16a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2V9zM2 13h20v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"/><path d="M12 9v10"/></svg>',
+    admin: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>',
     logout: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>',
   };
   return icons[type] || '';
@@ -2387,6 +2408,10 @@ function handleUserMenuAction(menu) {
       return;
     case 'redeem':
       window.alert('Redeem codes are not available yet.');
+      return;
+    case 'admin-panel':
+      if (!isAdmin()) return;
+      window.openAdminPanelModal?.();
       return;
     default:
       return;
@@ -3432,6 +3457,150 @@ function initSendMoneyModal({ getActiveCurrency }) {
   });
 }
 
+function initAdminPanelModal() {
+  if (document.getElementById('adminPanelModal')) return;
+
+  const modal = document.createElement('div');
+  modal.className = 'deposit-modal admin-panel-modal';
+  modal.id = 'adminPanelModal';
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="deposit-overlay" id="adminPanelOverlay"></div>
+    <div class="deposit-dialog admin-panel-dialog" role="dialog" aria-modal="true" aria-labelledby="adminPanelTitle">
+      <button class="deposit-close" id="adminPanelClose" type="button" aria-label="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+      <h2 class="deposit-title" id="adminPanelTitle">Admin Panel</h2>
+      <p class="deposit-subtitle">Site management tools (admin only)</p>
+
+      <div class="admin-panel-actions">
+        <button type="button" class="admin-panel-btn admin-panel-btn--primary" id="adminPanelSendMoney">
+          <span class="admin-panel-btn-icon">${userMenuIcon('transactions')}</span>
+          <span class="admin-panel-btn-text">
+            <span class="admin-panel-btn-label">Send Money</span>
+            <span class="admin-panel-btn-desc">Transfer play money to a player</span>
+          </span>
+        </button>
+        <button type="button" class="admin-panel-btn admin-panel-btn--danger" id="adminPanelResetBalances">
+          <span class="admin-panel-btn-icon">${userMenuIcon('vault')}</span>
+          <span class="admin-panel-btn-text">
+            <span class="admin-panel-btn-label">Reset All Balances</span>
+            <span class="admin-panel-btn-desc">Set every player wallet to $0</span>
+          </span>
+        </button>
+        <button type="button" class="admin-panel-btn admin-panel-btn--danger" id="adminPanelResetLeaderboards">
+          <span class="admin-panel-btn-icon">${userMenuIcon('vip')}</span>
+          <span class="admin-panel-btn-text">
+            <span class="admin-panel-btn-label">Reset Originals Leaderboards</span>
+            <span class="admin-panel-btn-desc">Clear wins, bets, and recent bet history</span>
+          </span>
+        </button>
+      </div>
+
+      <p class="deposit-error" id="adminPanelError" hidden></p>
+      <p class="deposit-success" id="adminPanelSuccess" hidden></p>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const overlay = document.getElementById('adminPanelOverlay');
+  const closeBtn = document.getElementById('adminPanelClose');
+  const sendBtn = document.getElementById('adminPanelSendMoney');
+  const resetBalancesBtn = document.getElementById('adminPanelResetBalances');
+  const resetLeaderboardsBtn = document.getElementById('adminPanelResetLeaderboards');
+  const errorEl = document.getElementById('adminPanelError');
+  const successEl = document.getElementById('adminPanelSuccess');
+
+  function clearAdminPanelMessages() {
+    errorEl.hidden = true;
+    successEl.hidden = true;
+  }
+
+  function closeAdminPanelModal() {
+    modal.hidden = true;
+    document.body.style.overflow = '';
+    clearAdminPanelMessages();
+  }
+
+  window.openAdminPanelModal = function openAdminPanelModal() {
+    if (!isAdmin()) return;
+    clearAdminPanelMessages();
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+  };
+
+  overlay.addEventListener('click', closeAdminPanelModal);
+  closeBtn.addEventListener('click', closeAdminPanelModal);
+
+  sendBtn.addEventListener('click', () => {
+    if (!isAdmin()) return;
+    closeAdminPanelModal();
+    window.openSendMoneyModal?.();
+  });
+
+  resetBalancesBtn.addEventListener('click', async () => {
+    if (!isAdmin()) return;
+    clearAdminPanelMessages();
+
+    const confirmed = window.confirm(
+      'Reset ALL player balances to $0?\n\nThis cannot be undone and affects every registered player.'
+    );
+    if (!confirmed) return;
+
+    resetBalancesBtn.disabled = true;
+    const result = await postWalletAction({
+      action: 'reset-all',
+      admin: getLoggedInUsername(),
+    });
+    resetBalancesBtn.disabled = false;
+
+    if (!result?.ok) {
+      errorEl.textContent = result?.data?.error || 'Could not reset balances. Try again.';
+      errorEl.hidden = false;
+      return;
+    }
+
+    if (result.data?.resetAt) {
+      await applyServerWalletReset(result.data.resetAt);
+    } else {
+      await ensureWalletResetSynced();
+    }
+
+    successEl.textContent = 'All player balances reset to $0.';
+    successEl.hidden = false;
+  });
+
+  resetLeaderboardsBtn.addEventListener('click', async () => {
+    if (!isAdmin()) return;
+    clearAdminPanelMessages();
+
+    const confirmed = window.confirm(
+      'Reset Originals leaderboards?\n\nThis clears all wins, bet counts, and recent bet history.'
+    );
+    if (!confirmed) return;
+
+    resetLeaderboardsBtn.disabled = true;
+    const result = await postLeaderboardAction({
+      action: 'reset-originals',
+      admin: getLoggedInUsername(),
+    });
+    resetLeaderboardsBtn.disabled = false;
+
+    if (!result?.ok) {
+      errorEl.textContent = result?.data?.error || 'Could not reset leaderboards. Try again.';
+      errorEl.hidden = false;
+      return;
+    }
+
+    await refreshLeaderboard();
+    successEl.textContent = 'Originals leaderboards cleared.';
+    successEl.hidden = false;
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !modal.hidden) closeAdminPanelModal();
+  });
+}
+
 function initVaultModal({ getActiveCurrency }) {
   if (document.getElementById('vaultModal')) return;
 
@@ -3648,6 +3817,7 @@ function initCommon() {
   initSidebar();
   initRightPanelToggle();
   initWallet();
+  initAdminPanelModal();
   initAuth();
   initUserSettings();
   initPanelTabs();

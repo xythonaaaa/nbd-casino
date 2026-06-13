@@ -720,6 +720,15 @@ input {
   opacity: 1;
 }
 
+.user-menu-item--admin {
+  color: #c4b5fd;
+}
+
+.user-menu-item--admin:hover {
+  background: rgba(147, 51, 234, 0.12);
+  color: #ddd6fe;
+}
+
 /* Header wallet */
 .header-wallet {
   position: relative;
@@ -1133,6 +1142,104 @@ input {
 
 .deposit-submit:active {
   transform: translateY(1px);
+}
+
+.admin-panel-dialog {
+  max-width: 440px;
+}
+
+.admin-panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.admin-panel-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  text-align: left;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: background var(--transition), border-color var(--transition), transform var(--transition);
+}
+
+.admin-panel-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.admin-panel-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.admin-panel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-panel-btn--primary {
+  border-color: rgba(147, 51, 234, 0.35);
+  background: rgba(147, 51, 234, 0.1);
+}
+
+.admin-panel-btn--primary:hover:not(:disabled) {
+  background: rgba(147, 51, 234, 0.16);
+  border-color: rgba(147, 51, 234, 0.5);
+}
+
+.admin-panel-btn--danger {
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.admin-panel-btn--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.admin-panel-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+}
+
+.admin-panel-btn--primary .admin-panel-btn-icon {
+  background: rgba(147, 51, 234, 0.2);
+  color: #c4b5fd;
+}
+
+.admin-panel-btn--danger .admin-panel-btn-icon {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+}
+
+.admin-panel-btn-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-panel-btn-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.admin-panel-btn-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.35;
 }
 
 .vault-balances {

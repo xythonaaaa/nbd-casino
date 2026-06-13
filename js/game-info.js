@@ -133,7 +133,7 @@ function formatWinDate(ts) {
 
 function truncateUser(name, hidden) {
   if (hidden) return 'Hidden';
-  return name.length > 4 ? `${name.slice(0, 4)}…` : name;
+  return name;
 }
 
 function getBetCount(gameId) {
@@ -236,7 +236,7 @@ function buildPanel(gameId, info) {
                 <ul class="gi-desc-list">
                   <li>Provably fair NBD Original</li>
                   <li>RTP ${info.rtp.toFixed(2)}% — house edge built into payouts</li>
-                  <li>Leaderboard shows real wins from NBD Casino players</li>
+                  <li>Leaderboard shows real wins from all NBD Casino players</li>
                 </ul>
               </div>
             </div>

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coinflip | NBD Casino</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/coinflip.css">
+</head>
+<body data-page="originals">
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="logo">
+          <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
+            <path d="M16 2L28 9V23L16 30L4 23V9L16 2Z" fill="url(#logoGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+            <path d="M16 8L22 11.5V18.5L16 22L10 18.5V11.5L16 8Z" fill="rgba(255,255,255,0.9)"/>
+            <defs>
+              <linearGradient id="logoGrad" x1="4" y1="2" x2="28" y2="30">
+                <stop stop-color="#9333ea"/>
+                <stop offset="1" stop-color="#000000"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="logo-text">NBD Casino</span>
+        </a>
+        <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item" data-nav="casino">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+          Casino
+        </a>
+        <a href="originals.html" class="nav-item active" data-nav="originals">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Originals
+        </a>
+      </nav>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="top-header">
+        <div class="header-start">
+          <button class="hamburger" id="hamburger" aria-label="Open menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          </button>
+          <a href="originals.html" class="cf-back">← Originals</a>
+        </div>
+        <div class="header-center">
+          <div class="header-wallet">
+            <button class="wallet-balance" id="walletBalance" type="button" aria-haspopup="true" aria-expanded="false">
+              <span class="wallet-currency-icon">$</span>
+              <span class="wallet-amount" id="walletAmount">0.00</span>
+              <svg class="wallet-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <button class="wallet-deposit" id="walletDeposit" type="button">Deposit</button>
+            <div class="wallet-dropdown" id="walletDropdown" hidden>
+              <button type="button" class="wallet-option active" data-currency="USD" data-amount="0.00">USD — $0.00</button>
+              <button type="button" class="wallet-option" data-currency="BTC" data-amount="0.00000000">BTC — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="ETH" data-amount="0.00000000">ETH — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="LTC" data-amount="0.00000000">LTC — 0.00000000</button>
+            </div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost">Log In</button>
+          <button class="btn btn-primary">Register</button>
+        </div>
+      </header>
+
+      <div class="cf-game">
+        <aside class="cf-panel">
+          <div class="cf-tabs">
+            <button type="button" class="cf-tab active" id="cfTabManual">Manual</button>
+            <button type="button" class="cf-tab" id="cfTabAuto">Auto</button>
+          </div>
+
+          <div class="cf-field">
+            <div class="cf-field-head">
+              <label for="cfBet">Bet Amount</label>
+              <span id="cfBetCurrency">0.00 USD</span>
+            </div>
+            <div class="cf-bet-row">
+              <div class="cf-bet-input-wrap">
+                <span class="cf-bet-icon">$</span>
+                <input type="number" id="cfBet" class="cf-bet-input" min="0" step="0.01" value="10" placeholder="0.00">
+              </div>
+              <button type="button" class="cf-bet-adjust" id="cfHalf">1/2</button>
+              <button type="button" class="cf-bet-adjust" id="cfDouble">2x</button>
+            </div>
+          </div>
+
+          <div class="cf-field">
+            <label>Pick Side</label>
+            <div class="cf-side-toggle">
+              <button type="button" class="cf-side-btn active" id="cfHeads" data-side="heads">
+                <span class="cf-side-dot cf-side-dot--heads"></span>
+                Takes
+              </button>
+              <button type="button" class="cf-side-btn" id="cfTails" data-side="tails">
+                <span class="cf-side-dot cf-side-dot--tails"></span>
+                Krown
+              </button>
+            </div>
+          </div>
+
+          <div class="cf-stats">
+            <div class="cf-stat">
+              <span class="cf-stat-label">Multiplier</span>
+              <span class="cf-stat-value" id="cfMultiplier">2x</span>
+            </div>
+            <div class="cf-stat">
+              <span class="cf-stat-label">Win Chance</span>
+              <span class="cf-stat-value" id="cfWinChance">50.00%</span>
+            </div>
+            <div class="cf-stat">
+              <span class="cf-stat-label">Profit on Win</span>
+              <span class="cf-stat-value cf-stat-value--gold" id="cfProfit">+$10.00</span>
+            </div>
+          </div>
+
+          <div id="cfManualActions">
+            <button type="button" class="cf-action" id="cfFlipBtn">Flip Coin</button>
+          </div>
+
+          <div id="cfAutoPanel" hidden>
+            <div class="cf-field">
+              <label for="cfAutoBets">Number of Bets</label>
+              <input type="number" id="cfAutoBets" class="cf-auto-input" min="0" step="1" value="10" placeholder="0 = unlimited">
+            </div>
+
+            <div class="cf-field">
+              <label for="cfOnWinMode">On Win</label>
+              <div class="cf-auto-strategy">
+                <select id="cfOnWinMode" class="cf-select">
+                  <option value="reset">Reset bet</option>
+                  <option value="increase">Increase by</option>
+                </select>
+                <div class="cf-auto-pct-wrap" id="cfOnWinPctWrap" hidden>
+                  <input type="number" id="cfOnWinPct" class="cf-auto-input cf-auto-input--pct" min="0" step="1" value="0">
+                  <span class="cf-auto-pct-suffix">%</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="cf-field">
+              <label for="cfOnLossMode">On Loss</label>
+              <div class="cf-auto-strategy">
+                <select id="cfOnLossMode" class="cf-select">
+                  <option value="reset">Reset bet</option>
+                  <option value="increase">Increase by</option>
+                </select>
+                <div class="cf-auto-pct-wrap" id="cfOnLossPctWrap" hidden>
+                  <input type="number" id="cfOnLossPct" class="cf-auto-input cf-auto-input--pct" min="0" step="1" value="100">
+                  <span class="cf-auto-pct-suffix">%</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="cf-field">
+              <label for="cfStopProfit">Stop on Profit</label>
+              <div class="cf-bet-input-wrap">
+                <span class="cf-bet-icon">$</span>
+                <input type="number" id="cfStopProfit" class="cf-bet-input" min="0" step="0.01" value="0" placeholder="0">
+              </div>
+            </div>
+
+            <div class="cf-field">
+              <label for="cfStopLoss">Stop on Loss</label>
+              <div class="cf-bet-input-wrap">
+                <span class="cf-bet-icon">$</span>
+                <input type="number" id="cfStopLoss" class="cf-bet-input" min="0" step="0.01" value="0" placeholder="0">
+              </div>
+            </div>
+
+            <div class="cf-auto-progress" id="cfAutoProgress">
+              <div class="cf-auto-progress-row">
+                <span class="cf-auto-progress-label">Bets</span>
+                <span class="cf-auto-progress-value" id="cfAutoBetCount">0 / 10</span>
+              </div>
+              <div class="cf-auto-progress-row">
+                <span class="cf-auto-progress-label">Session profit</span>
+                <span class="cf-auto-progress-value" id="cfAutoProfit">$0.00</span>
+              </div>
+            </div>
+
+            <button type="button" class="cf-action" id="cfAutoStart">Start Autobet</button>
+            <button type="button" class="cf-action cf-action--stop" id="cfAutoStop" hidden>Stop</button>
+          </div>
+
+          <p class="cf-message" id="cfMessage"></p>
+        </aside>
+
+        <main class="cf-board">
+          <div class="cf-board-inner">
+            <div class="cf-flip-stage" id="cfFlipStage">
+              <div class="cf-coin-wrap">
+                <div class="cf-coin" id="cfCoin">
+                  <div class="cf-coin-face cf-coin-face--heads">
+                    <img class="cf-coin-img" src="assets/coinflip/heads.png" alt="">
+                  </div>
+                  <div class="cf-coin-face cf-coin-face--tails">
+                    <img class="cf-coin-img" src="assets/coinflip/tails.png" alt="">
+                  </div>
+                  <div class="cf-coin-edge"></div>
+                </div>
+              </div>
+              <p class="cf-result-label" id="cfResultLabel">Pick a side and flip</p>
+            </div>
+
+            <div class="cf-result-popup" id="cfResultPopup" hidden>
+              <div class="cf-result-popup-card" id="cfResultCard">
+                <p class="cf-result-popup-label" id="cfPopupLabel"></p>
+                <div class="cf-result-popup-mult" id="cfPopupMult"></div>
+                <p class="cf-result-popup-text" id="cfPopupText"></p>
+              </div>
+            </div>
+          </div>
+          <div class="cf-footer">
+            <span class="cf-brand">NBD</span>
+          </div>
+        </main>
+
+        <aside class="cf-history" aria-label="Recent flips">
+          <span class="cf-history-head">Recent</span>
+          <div class="cf-history-list" id="cfHistoryList"></div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <script src="js/common.js"></script>
+  <script src="js/coinflip.js"></script>
+</body>
+</html>

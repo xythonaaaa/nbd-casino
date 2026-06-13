@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tower | NBD Casino</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/tower.css">
+</head>
+<body data-page="originals">
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="logo">
+          <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
+            <path d="M16 2L28 9V23L16 30L4 23V9L16 2Z" fill="url(#logoGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+            <path d="M16 8L22 11.5V18.5L16 22L10 18.5V11.5L16 8Z" fill="rgba(255,255,255,0.9)"/>
+            <defs>
+              <linearGradient id="logoGrad" x1="4" y1="2" x2="28" y2="30">
+                <stop stop-color="#9333ea"/>
+                <stop offset="1" stop-color="#000000"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="logo-text">NBD Casino</span>
+        </a>
+        <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item" data-nav="casino">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+          Casino
+        </a>
+        <a href="originals.html" class="nav-item active" data-nav="originals">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Originals
+        </a>
+      </nav>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="top-header">
+        <div class="header-start">
+          <button class="hamburger" id="hamburger" aria-label="Open menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          </button>
+          <a href="originals.html" class="tw-back">← Originals</a>
+        </div>
+        <div class="header-center">
+          <div class="header-wallet">
+            <button class="wallet-balance" id="walletBalance" type="button" aria-haspopup="true" aria-expanded="false">
+              <span class="wallet-currency-icon">$</span>
+              <span class="wallet-amount" id="walletAmount">0.00</span>
+              <svg class="wallet-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <button class="wallet-deposit" id="walletDeposit" type="button">Deposit</button>
+            <div class="wallet-dropdown" id="walletDropdown" hidden>
+              <button type="button" class="wallet-option active" data-currency="USD" data-amount="0.00">USD — $0.00</button>
+              <button type="button" class="wallet-option" data-currency="BTC" data-amount="0.00000000">BTC — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="ETH" data-amount="0.00000000">ETH — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="LTC" data-amount="0.00000000">LTC — 0.00000000</button>
+            </div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost">Log In</button>
+          <button class="btn btn-primary">Register</button>
+        </div>
+      </header>
+
+      <div class="tw-game">
+        <aside class="tw-panel">
+          <div class="tw-tabs">
+            <button type="button" class="tw-tab active" id="twTabManual">Manual</button>
+            <button type="button" class="tw-tab" id="twTabAuto">Auto</button>
+          </div>
+
+          <div class="tw-field">
+            <div class="tw-field-head">
+              <label for="twBet">Bet Amount</label>
+              <span id="twBetCurrency">0.00 USD</span>
+            </div>
+            <div class="tw-bet-row">
+              <div class="tw-bet-input-wrap">
+                <span class="tw-bet-icon">$</span>
+                <input type="number" id="twBet" class="tw-bet-input" min="0" step="0.01" value="10" placeholder="0.00">
+              </div>
+              <button type="button" class="tw-bet-adjust" id="twHalf">1/2</button>
+              <button type="button" class="tw-bet-adjust" id="twDouble">2x</button>
+            </div>
+          </div>
+
+          <div class="tw-field">
+            <label for="twDifficulty">Difficulty</label>
+            <select id="twDifficulty" class="tw-select">
+              <option value="easy">Easy — 4 tiles</option>
+              <option value="medium" selected>Medium — 3 tiles</option>
+              <option value="hard">Hard — 2 tiles</option>
+              <option value="expert">Expert — 3 tiles, 2 traps</option>
+            </select>
+          </div>
+
+          <div class="tw-stats">
+            <div class="tw-stat">
+              <span class="tw-stat-label">Multiplier</span>
+              <span class="tw-stat-value" id="twMultiplier">1.00x</span>
+            </div>
+            <div class="tw-stat">
+              <span class="tw-stat-label">Floor</span>
+              <span class="tw-stat-value" id="twFloor">0 / 9</span>
+            </div>
+            <div class="tw-stat">
+              <span class="tw-stat-label">Cash Out</span>
+              <span class="tw-stat-value tw-stat-value--teal" id="twCashout">$0.00</span>
+            </div>
+          </div>
+
+          <div id="twManualPanel">
+            <button type="button" class="tw-action" id="twStartBtn">Start Climb</button>
+            <button type="button" class="tw-action tw-action--cashout" id="twCashoutBtn" hidden>Cash Out</button>
+          </div>
+
+          <div id="twAutoPanel" hidden>
+            <p class="tw-auto-hint">Click tiles on the tower to set your climb path, then start autobet.</p>
+
+            <div class="tw-field">
+              <label>Path</label>
+              <div class="tw-auto-path-row">
+                <span class="tw-auto-path-stat" id="twAutoPathStat">0 / 9 floors</span>
+                <button type="button" class="tw-auto-clear" id="twAutoClear">Clear</button>
+              </div>
+            </div>
+
+            <div class="tw-field">
+              <label for="twAutoBets">Number of Bets</label>
+              <div class="tw-auto-bets-row">
+                <input type="number" id="twAutoBets" class="tw-auto-input" min="0" step="1" value="10" placeholder="0">
+                <button type="button" class="tw-auto-infinity" id="twAutoInfinity" title="Unlimited bets" aria-pressed="false">∞</button>
+              </div>
+            </div>
+
+            <div class="tw-auto-advanced" id="twAutoAdvanced" hidden>
+              <div class="tw-auto-grid">
+                <div class="tw-field tw-field--compact">
+                  <label for="twOnWinMode">On Win</label>
+                  <select id="twOnWinMode" class="tw-select tw-select--compact">
+                    <option value="reset">Reset</option>
+                    <option value="increase">Increase</option>
+                  </select>
+                  <div class="tw-auto-pct-wrap" id="twOnWinPctWrap" hidden>
+                    <input type="number" id="twOnWinPct" class="tw-auto-input tw-auto-input--pct" min="0" step="1" value="0">
+                    <span class="tw-auto-pct-suffix">%</span>
+                  </div>
+                </div>
+                <div class="tw-field tw-field--compact">
+                  <label for="twOnLossMode">On Loss</label>
+                  <select id="twOnLossMode" class="tw-select tw-select--compact">
+                    <option value="reset" selected>Reset</option>
+                    <option value="increase">Increase</option>
+                  </select>
+                  <div class="tw-auto-pct-wrap" id="twOnLossPctWrap" hidden>
+                    <input type="number" id="twOnLossPct" class="tw-auto-input tw-auto-input--pct" min="0" step="1" value="100">
+                    <span class="tw-auto-pct-suffix">%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tw-auto-grid">
+                <div class="tw-field tw-field--compact">
+                  <label for="twStopProfit">Stop on Profit</label>
+                  <div class="tw-bet-input-wrap tw-bet-input-wrap--compact">
+                    <span class="tw-bet-icon">$</span>
+                    <input type="number" id="twStopProfit" class="tw-bet-input" min="0" step="0.01" value="0" placeholder="0">
+                  </div>
+                </div>
+                <div class="tw-field tw-field--compact">
+                  <label for="twStopLoss">Stop on Loss</label>
+                  <div class="tw-bet-input-wrap tw-bet-input-wrap--compact">
+                    <span class="tw-bet-icon">$</span>
+                    <input type="number" id="twStopLoss" class="tw-bet-input" min="0" step="0.01" value="0" placeholder="0">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tw-auto-progress" id="twAutoProgress" hidden>
+              <div class="tw-auto-progress-row">
+                <span class="tw-auto-progress-label">Bets</span>
+                <span class="tw-auto-progress-value" id="twAutoBetCount">0 / 10</span>
+              </div>
+              <div class="tw-auto-progress-row">
+                <span class="tw-auto-progress-label">Session profit</span>
+                <span class="tw-auto-progress-value" id="twAutoProfit">+$0.00</span>
+              </div>
+            </div>
+
+            <button type="button" class="tw-action tw-action--configure" id="twAutoConfigure">Configure Auto</button>
+            <button type="button" class="tw-action tw-action--auto" id="twAutoStart">Start Autobet</button>
+            <button type="button" class="tw-action tw-action--stop" id="twAutoStop" hidden>Stop</button>
+          </div>
+
+          <p class="tw-message" id="twMessage"></p>
+        </aside>
+
+        <main class="tw-board">
+          <div class="tw-board-inner">
+            <div class="tw-stage" id="twStage">
+              <div class="tw-sky">
+                <div class="tw-sky-fx" aria-hidden="true">
+                  <span class="tw-sky-stars"></span>
+                  <span class="tw-sky-aurora"></span>
+                  <span class="tw-sky-vignette"></span>
+                  <span class="tw-summit-beacon"></span>
+                </div>
+                <div class="tw-spire" aria-hidden="true">
+                  <span class="tw-spire-glow"></span>
+                  <span class="tw-spire-tip"></span>
+                  <span class="tw-spire-beam"></span>
+                  <span class="tw-spire-ring tw-spire-ring--1"></span>
+                  <span class="tw-spire-ring tw-spire-ring--2"></span>
+                  <span class="tw-spire-base"></span>
+                </div>
+                <div class="tw-tower-wrap">
+                  <span class="tw-tower-spine" aria-hidden="true"></span>
+                  <div class="tw-tower" id="twTower"></div>
+                  <span class="tw-tower-base" aria-hidden="true"></span>
+                </div>
+                <div class="tw-climber" id="twClimber" hidden>
+                  <span class="tw-climber-glow"></span>
+                  <span class="tw-climber-icon">▲</span>
+                </div>
+              </div>
+              <p class="tw-status" id="twStatus"><span class="tw-status-dot"></span><span class="tw-status-text">Pick a difficulty and start climbing</span></p>
+            </div>
+
+            <div class="tw-result-popup" id="twResultPopup" hidden>
+              <div class="tw-result-popup-card" id="twResultCard">
+                <p class="tw-result-popup-label" id="twPopupLabel"></p>
+                <div class="tw-result-popup-mult" id="twPopupMult"></div>
+                <p class="tw-result-popup-text" id="twPopupText"></p>
+              </div>
+            </div>
+          </div>
+          <div class="tw-footer">
+            <span class="tw-brand">NBD</span>
+          </div>
+        </main>
+
+        <aside class="tw-history" aria-label="Recent climbs">
+          <span class="tw-history-head">Recent</span>
+          <div class="tw-history-list" id="twHistoryList">
+            <p class="tw-history-empty">No climbs yet</p>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <script src="js/common.js"></script>
+  <script src="js/tower.js"></script>
+</body>
+</html>

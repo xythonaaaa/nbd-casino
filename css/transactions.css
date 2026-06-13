@@ -1,0 +1,154 @@
+.tx-main {
+  max-width: 720px;
+}
+
+.tx-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.tx-filter {
+  padding: 7px 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.tx-filter:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.tx-filter.active {
+  color: var(--accent-light);
+  background: rgba(147, 51, 234, 0.15);
+  border-color: rgba(147, 51, 234, 0.35);
+}
+
+.tx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tx-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+}
+
+.tx-row-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tx-row-icon--deposit {
+  background: rgba(74, 222, 128, 0.12);
+  color: #4ade80;
+}
+
+.tx-row-icon--bet {
+  background: rgba(248, 113, 113, 0.12);
+  color: #f87171;
+}
+
+.tx-row-icon--win {
+  background: rgba(147, 51, 234, 0.15);
+  color: var(--accent-light);
+}
+
+.tx-row-icon--reward {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+}
+
+.tx-row-icon--vault {
+  background: rgba(147, 51, 234, 0.15);
+  color: var(--accent-light);
+}
+
+.tx-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.tx-row-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.tx-row-detail {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tx-row-meta {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.tx-row-amount {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.tx-row-amount.is-credit {
+  color: #4ade80;
+}
+
+.tx-row-amount.is-debit {
+  color: #f87171;
+}
+
+.tx-row-time {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.tx-empty {
+  padding: 48px 24px;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+}
+
+@media (max-width: 768px) {
+  .tx-row {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .tx-row-icon {
+    width: 32px;
+    height: 32px;
+  }
+}

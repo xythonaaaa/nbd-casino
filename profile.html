@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile | NBD Casino</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/settings.css">
+  <link rel="stylesheet" href="css/profile.css">
+</head>
+<body data-page="profile">
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="logo">
+          <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
+            <path d="M16 2L28 9V23L16 30L4 23V9L16 2Z" fill="url(#logoGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+            <path d="M16 8L22 11.5V18.5L16 22L10 18.5V11.5L16 8Z" fill="rgba(255,255,255,0.9)"/>
+            <defs>
+              <linearGradient id="logoGrad" x1="4" y1="2" x2="28" y2="30">
+                <stop stop-color="#9333ea"/>
+                <stop offset="1" stop-color="#000000"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="logo-text">NBD Casino</span>
+        </a>
+        <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item" data-nav="casino">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+          Casino
+        </a>
+        <a href="originals.html" class="nav-item" data-nav="originals">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Originals
+        </a>
+        <a href="index.html" class="nav-item" data-nav="support">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Live Chat
+        </a>
+      </nav>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="top-header">
+        <div class="header-start">
+          <button class="hamburger" id="hamburger" aria-label="Open menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          </button>
+          <a href="index.html" class="header-brand">
+            <svg class="logo-icon" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+              <path d="M16 2L28 9V23L16 30L4 23V9L16 2Z" fill="url(#headerLogoGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+              <path d="M16 8L22 11.5V18.5L16 22L10 18.5V11.5L16 8Z" fill="rgba(255,255,255,0.9)"/>
+              <defs>
+                <linearGradient id="headerLogoGrad" x1="4" y1="2" x2="28" y2="30">
+                  <stop stop-color="#9333ea"/>
+                  <stop offset="1" stop-color="#000000"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <span class="header-brand-text">NBD Casino</span>
+          </a>
+        </div>
+        <div class="header-center">
+          <div class="header-wallet">
+            <button class="wallet-balance" id="walletBalance" type="button" aria-haspopup="true" aria-expanded="false">
+              <span class="wallet-currency-icon">$</span>
+              <span class="wallet-amount" id="walletAmount">0.00</span>
+              <svg class="wallet-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <button class="wallet-deposit" id="walletDeposit" type="button">Deposit</button>
+            <div class="wallet-dropdown" id="walletDropdown" hidden>
+              <button type="button" class="wallet-option active" data-currency="USD" data-amount="0.00">USD — $0.00</button>
+              <button type="button" class="wallet-option" data-currency="BTC" data-amount="0.00000000">BTC — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="ETH" data-amount="0.00000000">ETH — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="LTC" data-amount="0.00000000">LTC — 0.00000000</button>
+            </div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost">Log In</button>
+          <button class="btn btn-primary">Register</button>
+        </div>
+      </header>
+
+      <div class="settings-layout">
+        <aside class="account-nav">
+          <h2 class="account-nav-title">Account</h2>
+          <nav class="account-nav-list">
+            <a href="profile.html" class="account-nav-item active">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Profile
+            </a>
+            <a href="settings.html" class="account-nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+              Settings
+            </a>
+            <a href="transactions.html" class="account-nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4M7 4L3 8M7 4l4 4M17 8v12M17 20l4-4M17 20l-4-4"/></svg>
+              Transactions
+            </a>
+            <a href="vip.html" class="account-nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 19h20M2 7l4 5 6-8 6 8 4-5v12H2V7z"/></svg>
+              VIP
+            </a>
+            <a href="affiliates.html" class="account-nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M7.5 7.5L10.5 16M16.5 7.5L13.5 16M8 6h8"/></svg>
+              Affiliates
+            </a>
+            <a href="#" class="account-nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Security
+            </a>
+            <a href="#" class="account-nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              Session
+            </a>
+            <a href="#" class="account-nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
+              Ignored Users
+            </a>
+            <a href="#" class="account-nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>
+              Self Exclusion
+            </a>
+          </nav>
+        </aside>
+
+        <main class="settings-main profile-main">
+          <div class="profile-card profile-header-card">
+            <div class="profile-avatar-wrap">
+              <button type="button" class="profile-avatar-btn" id="profileAvatarBtn" aria-label="Change profile picture">
+                <span class="profile-avatar" id="profileAvatar">X</span>
+                <span class="profile-avatar-overlay">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                </span>
+              </button>
+              <input type="file" id="profileAvatarInput" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+              <button type="button" class="profile-avatar-remove" id="profileAvatarRemove" hidden>Remove photo</button>
+            </div>
+            <span class="profile-header-name" id="profileHeaderName">NBD</span>
+            <span class="profile-joined" id="profileJoined">Joined —</span>
+          </div>
+
+          <div class="profile-card profile-stats-card">
+            <div class="profile-stats-head">
+              <div>
+                <h3 class="profile-card-title">Play Summary</h3>
+                <p class="profile-stats-sub">Your activity across NBD Originals</p>
+              </div>
+              <button type="button" class="profile-export-btn" id="profileRequestStats">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                Export
+              </button>
+            </div>
+
+            <div class="profile-stats-body">
+              <div class="profile-rank-col">
+                <div class="profile-rank-ring" id="profileRankRing" aria-hidden="true">
+                  <svg class="profile-ring-svg" viewBox="0 0 88 88">
+                    <circle class="profile-ring-track" cx="44" cy="44" r="38"/>
+                    <circle class="profile-ring-fill" id="profileRingFill" cx="44" cy="44" r="38"/>
+                  </svg>
+                  <div class="profile-ring-center">
+                    <span class="profile-ring-pct" id="profileRankPct">0%</span>
+                    <span class="profile-ring-label" id="profileRankLabel">Unranked</span>
+                  </div>
+                </div>
+                <p class="profile-rank-next" id="profileRankNext"></p>
+              </div>
+
+              <div class="profile-stats-list">
+                <div class="profile-stat-row">
+                  <span class="profile-stat-icon profile-stat-icon--bets">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+                  </span>
+                  <div class="profile-stat-meta">
+                    <span class="profile-stat-label">Bets placed</span>
+                    <span class="profile-stat-value" id="statTotalBets">0</span>
+                  </div>
+                </div>
+                <div class="profile-stat-row">
+                  <span class="profile-stat-icon profile-stat-icon--win">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 010-5H6M18 9h1.5a2.5 2.5 0 000-5H18M6 9l2 12h8l2-12M6 9h12"/></svg>
+                  </span>
+                  <div class="profile-stat-meta">
+                    <span class="profile-stat-label">Wins</span>
+                    <span class="profile-stat-value profile-stat-value--win" id="statWins">0</span>
+                  </div>
+                </div>
+                <div class="profile-stat-row">
+                  <span class="profile-stat-icon profile-stat-icon--loss">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10zM20 15v4a3 3 0 01-3 3l-4-9V2h8.28a2 2 0 012 1.7l1.38 9a2 2 0 01-2 2.3H20z"/></svg>
+                  </span>
+                  <div class="profile-stat-meta">
+                    <span class="profile-stat-label">Losses</span>
+                    <span class="profile-stat-value profile-stat-value--loss" id="statLosses">0</span>
+                  </div>
+                </div>
+                <div class="profile-stat-row profile-stat-row--wagered">
+                  <span class="profile-stat-icon profile-stat-icon--wagered">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                  </span>
+                  <div class="profile-stat-meta">
+                    <span class="profile-stat-label">Total wagered</span>
+                    <span class="profile-stat-value profile-stat-value--wagered" id="statWagered">$0.00</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="profile-winrate-bar">
+              <div class="profile-winrate-fill" id="profileWinRateFill"></div>
+            </div>
+            <p class="profile-winrate-text" id="profileWinRateText">Win rate — 0%</p>
+          </div>
+
+          <div class="profile-card">
+            <div class="profile-card-head">
+              <h3 class="profile-card-title">Your Badges</h3>
+              <button type="button" class="profile-icon-btn" title="Badge info" aria-label="Badge info">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+              </button>
+            </div>
+            <div class="profile-badges">
+              <span class="profile-badge" title="Crown">👑</span>
+              <span class="profile-badge" title="Chicken">🐔</span>
+              <span class="profile-badge" title="Gift">🎁</span>
+              <span class="profile-badge profile-badge--text">OG</span>
+              <span class="profile-badge" title="Trophy">🏆</span>
+              <span class="profile-badge" title="Money">💰</span>
+              <span class="profile-badge profile-badge--text">1K</span>
+            </div>
+          </div>
+
+          <div class="profile-card">
+            <div class="profile-card-head">
+              <h3 class="profile-card-title">Your Information</h3>
+              <button type="button" class="profile-icon-btn" id="profileToggleInfo" title="Toggle visibility" aria-label="Toggle visibility">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+
+            <label class="profile-field-label" for="profileUsername">Username</label>
+            <input type="text" id="profileUsername" class="profile-input" readonly>
+
+            <label class="profile-field-label" for="profileEmail">Email Address</label>
+            <div class="profile-email-row">
+              <input type="email" id="profileEmail" class="profile-input" placeholder="Add your email">
+              <button type="button" class="profile-verify-btn" id="profileVerifyEmail">Verify</button>
+            </div>
+            <p class="profile-toast" id="profileToast" hidden></p>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <script src="js/common.js"></script>
+  <script src="js/profile.js"></script>
+</body>
+</html>

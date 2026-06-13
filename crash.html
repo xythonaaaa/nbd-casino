@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crash | NBD Casino</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/crash.css">
+</head>
+<body data-page="originals">
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="logo">
+          <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
+            <path d="M16 2L28 9V23L16 30L4 23V9L16 2Z" fill="url(#logoGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+            <path d="M16 8L22 11.5V18.5L16 22L10 18.5V11.5L16 8Z" fill="rgba(255,255,255,0.9)"/>
+            <defs>
+              <linearGradient id="logoGrad" x1="4" y1="2" x2="28" y2="30">
+                <stop stop-color="#9333ea"/>
+                <stop offset="1" stop-color="#000000"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="logo-text">NBD Casino</span>
+        </a>
+        <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item" data-nav="casino">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+          Casino
+        </a>
+        <a href="originals.html" class="nav-item active" data-nav="originals">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Originals
+        </a>
+      </nav>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="top-header">
+        <div class="header-start">
+          <button class="hamburger" id="hamburger" aria-label="Open menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          </button>
+          <a href="originals.html" class="cr-back">← Originals</a>
+        </div>
+        <div class="header-center">
+          <div class="header-wallet">
+            <button class="wallet-balance" id="walletBalance" type="button" aria-haspopup="true" aria-expanded="false">
+              <span class="wallet-currency-icon">$</span>
+              <span class="wallet-amount" id="walletAmount">0.00</span>
+              <svg class="wallet-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <button class="wallet-deposit" id="walletDeposit" type="button">Deposit</button>
+            <div class="wallet-dropdown" id="walletDropdown" hidden>
+              <button type="button" class="wallet-option active" data-currency="USD" data-amount="0.00">USD — $0.00</button>
+              <button type="button" class="wallet-option" data-currency="BTC" data-amount="0.00000000">BTC — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="ETH" data-amount="0.00000000">ETH — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="LTC" data-amount="0.00000000">LTC — 0.00000000</button>
+            </div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost">Log In</button>
+          <button class="btn btn-primary">Register</button>
+        </div>
+      </header>
+
+      <div class="cr-game">
+        <aside class="cr-panel">
+          <div class="cr-tabs">
+            <button type="button" class="cr-tab active" id="crTabManual">Manual</button>
+            <button type="button" class="cr-tab" id="crTabAuto">Auto</button>
+          </div>
+
+          <div class="cr-field">
+            <div class="cr-field-head">
+              <label for="crBet">Bet Amount</label>
+              <span id="crBetCurrency">0.00 USD</span>
+            </div>
+            <div class="cr-bet-row">
+              <div class="cr-bet-input-wrap">
+                <span class="cr-bet-icon">$</span>
+                <input type="number" id="crBet" class="cr-bet-input" min="0" step="0.01" value="10" placeholder="0.00">
+              </div>
+              <button type="button" class="cr-bet-adjust" id="crHalf">1/2</button>
+              <button type="button" class="cr-bet-adjust" id="crDouble">2x</button>
+            </div>
+          </div>
+
+          <div class="cr-field">
+            <label for="crAutoCashout">Auto Cashout</label>
+            <div class="cr-bet-input-wrap">
+              <span class="cr-bet-icon cr-bet-icon--x">x</span>
+              <input type="number" id="crAutoCashout" class="cr-bet-input" min="0" step="0.01" value="2.00" placeholder="0 = off">
+            </div>
+          </div>
+
+          <div id="crManualActions">
+            <button type="button" class="cr-action cr-action--bet" id="crBetBtn">Place Bet</button>
+            <button type="button" class="cr-action cr-action--cashout" id="crCashoutBtn" hidden>Cash Out</button>
+          </div>
+
+          <div id="crAutoPanel" hidden>
+            <div class="cr-field">
+              <label for="crAutoBets">Number of Bets</label>
+              <div class="cr-auto-bets-row">
+                <input type="number" id="crAutoBets" class="cr-auto-input" min="0" step="1" value="0" placeholder="0">
+                <button type="button" class="cr-auto-infinity active" id="crAutoInfinity" title="Unlimited bets" aria-pressed="true">∞</button>
+              </div>
+            </div>
+
+            <div class="cr-auto-progress" id="crAutoProgress" hidden>
+              <div class="cr-auto-progress-row">
+                <span class="cr-auto-progress-label">Bets</span>
+                <span class="cr-auto-progress-value" id="crAutoBetCount">0 / ∞</span>
+              </div>
+              <div class="cr-auto-progress-row">
+                <span class="cr-auto-progress-label">Session profit</span>
+                <span class="cr-auto-progress-value" id="crAutoProfit">+$0.00</span>
+              </div>
+            </div>
+
+            <button type="button" class="cr-action cr-action--bet" id="crAutoStart">Start Autobet</button>
+            <button type="button" class="cr-action cr-action--stop" id="crAutoStop" hidden>Stop</button>
+          </div>
+
+          <p class="cr-message" id="crMessage"></p>
+        </aside>
+
+        <main class="cr-board">
+          <div class="cr-board-inner">
+            <div class="cr-stage">
+              <canvas class="cr-graph" id="crGraph" aria-hidden="true"></canvas>
+              <div class="cr-rocket-wrap" id="crRocketWrap">
+                <div class="cr-rocket" id="crRocket" aria-hidden="true">
+                  <span class="cr-rocket-body"></span>
+                  <span class="cr-rocket-nose"></span>
+                  <span class="cr-rocket-fin cr-rocket-fin--l"></span>
+                  <span class="cr-rocket-fin cr-rocket-fin--r"></span>
+                  <span class="cr-rocket-window"></span>
+                  <span class="cr-rocket-flame"></span>
+                </div>
+              </div>
+              <div class="cr-mult" id="crMult">1.00x</div>
+              <p class="cr-status" id="crStatus">Place a bet to launch</p>
+            </div>
+          </div>
+          <div class="cr-footer">
+            <span class="cr-brand">NBD</span>
+          </div>
+        </main>
+
+        <aside class="cr-history" id="crHistory" aria-label="Recent crashes">
+          <span class="cr-history-head">Recent</span>
+          <div class="cr-history-list" id="crHistoryList"></div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <script src="js/common.js"></script>
+  <script src="js/crash.js"></script>
+</body>
+</html>

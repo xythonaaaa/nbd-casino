@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto Casino Online - Play with Bitcoin & Crypto | NBD Casino</title>
+  <meta name="description" content="Play slots, originals, and live casino games with Bitcoin and crypto. Instant deposits, provably fair games, and daily bonuses.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/casino-home.css">
+</head>
+<body data-page="casino">
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="logo">
+          <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
+            <path d="M16 2L28 9V23L16 30L4 23V9L16 2Z" fill="url(#logoGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+            <path d="M16 8L22 11.5V18.5L16 22L10 18.5V11.5L16 8Z" fill="rgba(255,255,255,0.9)"/>
+            <defs>
+              <linearGradient id="logoGrad" x1="4" y1="2" x2="28" y2="30">
+                <stop stop-color="#9333ea"/>
+                <stop offset="1" stop-color="#000000"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="logo-text">NBD Casino</span>
+        </a>
+        <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item" data-nav="casino">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+          Casino
+        </a>
+        <a href="originals.html" class="nav-item" data-nav="originals">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Originals
+        </a>
+        <a href="#chatPanel" class="nav-item" data-nav="support">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Live Chat
+        </a>
+      </nav>
+
+      <div class="sidebar-section">
+        <span class="sidebar-label">Language</span>
+        <button class="lang-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+          English
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="nav-item menu-toggle-btn" id="menuToggle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          Menu
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <div class="main-wrapper">
+      <!-- Top header -->
+      <header class="top-header">
+        <div class="header-start">
+          <button class="hamburger" id="hamburger" aria-label="Open menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          </button>
+
+          <a href="index.html" class="header-brand">
+            <svg class="logo-icon" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+              <path d="M16 2L28 9V23L16 30L4 23V9L16 2Z" fill="url(#headerLogoGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+              <path d="M16 8L22 11.5V18.5L16 22L10 18.5V11.5L16 8Z" fill="rgba(255,255,255,0.9)"/>
+              <defs>
+                <linearGradient id="headerLogoGrad" x1="4" y1="2" x2="28" y2="30">
+                  <stop stop-color="#9333ea"/>
+                  <stop offset="1" stop-color="#000000"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <span class="header-brand-text">NBD Casino</span>
+          </a>
+
+          <div class="header-tabs">
+            <a href="#" class="header-tab active">Casino</a>
+            <a href="#" class="header-tab">Sports</a>
+          </div>
+        </div>
+
+        <div class="header-center">
+          <div class="header-wallet">
+            <button class="wallet-balance" id="walletBalance" type="button" aria-haspopup="true" aria-expanded="false">
+              <span class="wallet-currency-icon" aria-hidden="true">$</span>
+              <span class="wallet-amount" id="walletAmount">0.00</span>
+              <svg class="wallet-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <button class="wallet-deposit" id="walletDeposit" type="button">Deposit</button>
+            <div class="wallet-dropdown" id="walletDropdown" hidden>
+              <button type="button" class="wallet-option active" data-currency="USD" data-amount="0.00">USD — $0.00</button>
+              <button type="button" class="wallet-option" data-currency="BTC" data-amount="0.00000000">BTC — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="ETH" data-amount="0.00000000">ETH — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="LTC" data-amount="0.00000000">LTC — 0.00000000</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button class="btn btn-ghost">Log In</button>
+          <button class="btn btn-primary">Register</button>
+        </div>
+      </header>
+
+      <div class="content-area">
+        <main class="main-content">
+          <!-- Promo carousel -->
+          <section class="promo-carousel" id="promoCarousel">
+            <div class="carousel-track">
+              <div class="promo-slide active" data-slide="0">
+                <div class="promo-content">
+                  <span class="promo-badge">FIFA World Cup 2026</span>
+                  <h2>Bet on the Biggest Tournament</h2>
+                  <p>Exclusive odds & crypto bonuses for every match</p>
+                  <button class="btn btn-primary btn-sm">Play Now</button>
+                </div>
+                <div class="promo-visual promo-visual--soccer"></div>
+              </div>
+              <div class="promo-slide" data-slide="1">
+                <div class="promo-content">
+                  <span class="promo-badge new">New Original</span>
+                  <h2>Surrender or Go to War</h2>
+                  <p>Our newest provably fair card game — beat the dealer</p>
+                  <button class="btn btn-primary btn-sm">Try It</button>
+                </div>
+                <div class="promo-visual promo-visual--cards"></div>
+              </div>
+              <div class="promo-slide" data-slide="2">
+                <div class="promo-content">
+                  <span class="promo-badge new">New Pre-Release</span>
+                  <h2>Monopoly Experience!</h2>
+                  <p>Roll the dice and win up to 500x your bet</p>
+                  <button class="btn btn-primary btn-sm">Early Access</button>
+                </div>
+                <div class="promo-visual promo-visual--dice"></div>
+              </div>
+              <div class="promo-slide" data-slide="3">
+                <div class="promo-content">
+                  <span class="promo-badge">Rewards</span>
+                  <h2>Daily, Weekly & Monthly!</h2>
+                  <p>Get bonus rewards on every deposit you make</p>
+                  <button class="btn btn-primary btn-sm">Get Bonus</button>
+                </div>
+                <div class="promo-visual promo-visual--bonus"></div>
+              </div>
+            </div>
+            <div class="carousel-dots" id="carouselDots"></div>
+            <button class="carousel-btn carousel-prev" id="carouselPrev" aria-label="Previous slide">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <button class="carousel-btn carousel-next" id="carouselNext" aria-label="Next slide">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </section>
+
+          <!-- Jackpot counters -->
+          <div class="casino-jackpot-bar" aria-label="Jackpot counters">
+            <div class="casino-jackpot-item">
+              <span class="casino-jackpot-label">Daily Jackpot</span>
+              <span class="casino-jackpot-value" id="jackpotDaily">$124,892.50</span>
+            </div>
+            <div class="casino-jackpot-item">
+              <span class="casino-jackpot-label">Total Paid Out</span>
+              <span class="casino-jackpot-value" id="jackpotPaid">$2.4M+</span>
+            </div>
+            <div class="casino-jackpot-item">
+              <span class="casino-jackpot-label">Players Online</span>
+              <span class="casino-jackpot-value" id="jackpotOnline">1,247</span>
+            </div>
+          </div>
+
+          <!-- Live wins ticker -->
+          <section class="live-wins">
+            <div class="live-wins-header">
+              <span class="live-dot"></span>
+              <span class="live-wins-title">Live Wins</span>
+            </div>
+            <div class="live-wins-viewport">
+              <div class="live-wins-track" id="liveWinsTrack"></div>
+            </div>
+          </section>
+
+          <!-- Category filters -->
+          <section class="category-filters" id="categoryFilters">
+            <div class="filter-tabs" id="filterTabs">
+              <button class="filter-tab active" data-filter="all">All</button>
+              <button class="filter-tab" data-filter="slots">Slots</button>
+              <a href="originals.html" class="filter-tab">Originals</a>
+              <button class="filter-tab" data-filter="live">Live</button>
+            </div>
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              <input type="search" placeholder="Search games..." id="gameSearch">
+            </div>
+          </section>
+
+          <!-- Game sections -->
+          <section class="game-section" data-category="originals" id="originalsSection">
+            <div class="section-header">
+              <h2>Originals</h2>
+              <a href="originals.html" class="view-all">View All <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></a>
+            </div>
+            <div class="game-grid" id="originalsGrid"></div>
+          </section>
+
+          <section class="game-section" data-category="slots">
+            <div class="section-header">
+              <h2>Recommended Slots</h2>
+              <a href="#" class="view-all">View All <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></a>
+            </div>
+            <div class="game-grid" id="slotsGrid"></div>
+          </section>
+
+          <section class="game-section" data-category="slots">
+            <div class="section-header">
+              <h2>New Releases</h2>
+              <a href="#" class="view-all">View All <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></a>
+            </div>
+            <div class="game-grid" id="newReleasesGrid"></div>
+          </section>
+
+          <section class="game-section" data-category="live">
+            <div class="section-header">
+              <h2>Popular Live Games</h2>
+              <a href="#" class="view-all">View All <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></a>
+            </div>
+            <div class="game-grid game-grid--wide" id="liveGrid"></div>
+          </section>
+
+          <section class="game-section providers-section">
+            <div class="section-header">
+              <h2>Providers</h2>
+            </div>
+            <div class="providers-grid" id="providersGrid"></div>
+          </section>
+
+          <!-- SEO footer content -->
+          <footer class="seo-footer">
+            <h1>NBD Crypto Casino</h1>
+            <h2>What is a Crypto Casino and How It Works</h2>
+            <p>Crypto casinos are online platforms where you can play with cryptocurrencies like Bitcoin and Ethereum. They work just like regular online casinos but with the added bonus of using digital currencies for instant, low-fee transactions.</p>
+            <h2>Why NBD Casino is the Best Crypto Casino</h2>
+            <p>Quick transactions, provably fair games, and thousands of titles from top providers make NBD Casino a top choice for crypto gamblers. Enjoy daily, weekly, and monthly bonuses along with a seamless mobile experience.</p>
+          </footer>
+        </main>
+
+        <!-- Right panel -->
+        <button class="panel-reopen" id="panelReopen" type="button" aria-label="Show panel">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="2"/>
+            <path d="M15 4v16"/>
+          </svg>
+          <span class="panel-tooltip" role="tooltip">
+            <span class="panel-tooltip-label">Show Panel</span>
+            <span class="panel-tooltip-keys">
+              <kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>B</kbd>
+            </span>
+          </span>
+        </button>
+
+        <aside class="right-panel" id="rightPanel">
+          <div class="panel-tabs">
+            <button class="panel-tab active" data-panel="bets">Live Bets</button>
+            <button class="panel-tab" data-panel="chat">Chat</button>
+            <button class="panel-collapse" id="panelCollapse" type="button" aria-label="Hide panel">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="16" rx="2"/>
+                <path d="M15 4v16"/>
+              </svg>
+              <span class="panel-tooltip" role="tooltip">
+                <span class="panel-tooltip-label">Hide Panel</span>
+                <span class="panel-tooltip-keys">
+                  <kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>B</kbd>
+                </span>
+              </span>
+            </button>
+          </div>
+
+          <div class="panel-content active" id="betsPanel">
+            <div class="bets-subtabs">
+              <button class="bets-subtab active">All Bets</button>
+              <button class="bets-subtab">High Rollers</button>
+              <button class="bets-subtab">My Bets</button>
+            </div>
+            <div class="bets-list" id="betsList"></div>
+          </div>
+
+          <div class="panel-content" id="chatPanel">
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input-wrap">
+              <input type="text" placeholder="Type a message..." id="chatInput">
+              <button class="chat-send" id="chatSend" aria-label="Send message">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+              </button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <script src="js/games.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

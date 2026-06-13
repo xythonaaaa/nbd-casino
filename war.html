@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Surrender or War | NBD Casino</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/war.css">
+</head>
+<body data-page="originals">
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="logo">
+          <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
+            <path d="M16 2L28 9V23L16 30L4 23V9L16 2Z" fill="url(#logoGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+            <path d="M16 8L22 11.5V18.5L16 22L10 18.5V11.5L16 8Z" fill="rgba(255,255,255,0.9)"/>
+            <defs>
+              <linearGradient id="logoGrad" x1="4" y1="2" x2="28" y2="30">
+                <stop stop-color="#9333ea"/>
+                <stop offset="1" stop-color="#000000"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="logo-text">NBD Casino</span>
+        </a>
+        <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item" data-nav="casino">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+          Casino
+        </a>
+        <a href="originals.html" class="nav-item active" data-nav="originals">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Originals
+        </a>
+      </nav>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="top-header">
+        <div class="header-start">
+          <button class="hamburger" id="hamburger" aria-label="Open menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          </button>
+          <a href="originals.html" class="sw-back">← Originals</a>
+        </div>
+        <div class="header-center">
+          <div class="header-wallet">
+            <button class="wallet-balance" id="walletBalance" type="button" aria-haspopup="true" aria-expanded="false">
+              <span class="wallet-currency-icon">$</span>
+              <span class="wallet-amount" id="walletAmount">0.00</span>
+              <svg class="wallet-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <button class="wallet-deposit" id="walletDeposit" type="button">Deposit</button>
+            <div class="wallet-dropdown" id="walletDropdown" hidden>
+              <button type="button" class="wallet-option active" data-currency="USD" data-amount="0.00">USD — $0.00</button>
+              <button type="button" class="wallet-option" data-currency="BTC" data-amount="0.00000000">BTC — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="ETH" data-amount="0.00000000">ETH — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="LTC" data-amount="0.00000000">LTC — 0.00000000</button>
+            </div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost">Log In</button>
+          <button class="btn btn-primary">Register</button>
+        </div>
+      </header>
+
+      <div class="sw-game">
+        <aside class="sw-panel" id="swPanel">
+          <div class="sw-tabs">
+            <button type="button" class="sw-tab active" id="swTabManual">Manual</button>
+            <button type="button" class="sw-tab" id="swTabAuto">Auto</button>
+          </div>
+
+          <div class="sw-field">
+            <div class="sw-field-head">
+              <label for="swBet">Bet</label>
+              <span id="swBetCurrency">0.00 USD</span>
+            </div>
+            <div class="sw-bet-row">
+              <div class="sw-bet-input-wrap">
+                <span class="sw-currency-icon">$</span>
+                <input type="number" id="swBet" class="sw-bet-input" min="0" step="0.01" value="10" placeholder="0.00">
+              </div>
+              <button type="button" class="sw-bet-adjust" id="swHalf">1/2</button>
+              <button type="button" class="sw-bet-adjust" id="swDouble">2x</button>
+            </div>
+          </div>
+
+          <div class="sw-field">
+            <div class="sw-field-head">
+              <label for="swTieBet">
+                Tie Bet
+                <button type="button" class="sw-info" title="Optional side bet — pays 10:1 when the initial deal ties">i</button>
+              </label>
+              <span id="swTieBetCurrency">0.00 USD</span>
+            </div>
+            <div class="sw-bet-row">
+              <div class="sw-bet-input-wrap">
+                <span class="sw-currency-icon">$</span>
+                <input type="number" id="swTieBet" class="sw-bet-input" min="0" step="0.01" value="0" placeholder="0.00">
+              </div>
+              <button type="button" class="sw-bet-adjust" id="swTieHalf">1/2</button>
+              <button type="button" class="sw-bet-adjust" id="swTieDouble">2x</button>
+            </div>
+          </div>
+
+          <div id="swManualPanel">
+            <div id="swChoiceActions" hidden>
+              <p class="sw-choice-label">Tie — surrender half or go to war</p>
+              <button type="button" class="sw-action sw-action--muted" id="swSurrender">Surrender</button>
+              <button type="button" class="sw-action sw-action--war" id="swGoToWar">Go to War</button>
+            </div>
+
+            <div id="swPrimaryActions">
+              <button type="button" class="sw-action" id="swPlaceBet">Place Bet</button>
+            </div>
+          </div>
+
+          <div id="swAutoPanel" hidden>
+            <div class="sw-field">
+              <label for="swAutoBets">Number of Bets</label>
+              <div class="sw-auto-bets-row">
+                <input type="number" id="swAutoBets" class="sw-auto-input" min="1" step="1" value="100">
+                <button type="button" class="sw-auto-infinity" id="swAutoInfinity" title="Unlimited bets" aria-pressed="false">∞</button>
+              </div>
+            </div>
+
+            <div class="sw-auto-progress" id="swAutoProgress" hidden>
+              <div class="sw-auto-progress-row">
+                <span class="sw-auto-progress-label">Bets</span>
+                <span class="sw-auto-progress-value" id="swAutoBetCount">0 / 100</span>
+              </div>
+              <div class="sw-auto-progress-row">
+                <span class="sw-auto-progress-label">Session profit</span>
+                <span class="sw-auto-progress-value" id="swAutoProfit">+$0.00</span>
+              </div>
+            </div>
+
+            <button type="button" class="sw-action" id="swAutoStart">Start Autobet</button>
+            <button type="button" class="sw-action sw-action--stop" id="swAutoStop" hidden>Stop</button>
+          </div>
+
+          <p class="sw-message" id="swMessage"></p>
+        </aside>
+
+        <main class="sw-board">
+          <div class="sw-board-inner">
+            <div class="sw-rules" id="swRules">
+              <div class="sw-rules-pill">WIN PAYS EVEN</div>
+              <p class="sw-rules-sub">TIE PAYS 10 TO 1</p>
+            </div>
+
+            <div class="sw-table" id="swTable" hidden>
+              <div class="sw-card-slot sw-card-slot--dealer" id="swDealerSlot" aria-label="Dealer card"></div>
+              <div class="sw-card-slot sw-card-slot--player" id="swPlayerSlot" aria-label="Your card"></div>
+            </div>
+
+            <div class="sw-deck-slot" id="swDeckSlot" aria-hidden="true"></div>
+
+            <div class="sw-result-popup" id="swResultPopup" hidden>
+              <div class="sw-result-popup-card" id="swResultCard">
+                <p class="sw-result-popup-label" id="swResultLabel"></p>
+                <p class="sw-result-popup-text" id="swResultText"></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="sw-footer">
+            <div class="sw-footer-tools">
+              <span class="sw-footer-icon" title="Settings">⚙</span>
+              <span class="sw-footer-icon" title="Layout">▢</span>
+              <span class="sw-footer-icon" title="Provably fair">⚖</span>
+              <span class="sw-footer-icon" title="Stats">📈</span>
+              <span class="sw-footer-icon" title="Favorites">♥</span>
+            </div>
+            <span class="sw-brand">NBD</span>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <script src="js/common.js"></script>
+  <script src="js/war.js"></script>
+</body>
+</html>

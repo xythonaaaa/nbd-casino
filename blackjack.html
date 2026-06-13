@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blackjack | NBD Casino</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/blackjack.css">
+</head>
+<body data-page="originals">
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="logo">
+          <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
+            <path d="M16 2L28 9V23L16 30L4 23V9L16 2Z" fill="url(#logoGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+            <path d="M16 8L22 11.5V18.5L16 22L10 18.5V11.5L16 8Z" fill="rgba(255,255,255,0.9)"/>
+            <defs>
+              <linearGradient id="logoGrad" x1="4" y1="2" x2="28" y2="30">
+                <stop stop-color="#9333ea"/>
+                <stop offset="1" stop-color="#000000"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="logo-text">NBD Casino</span>
+        </a>
+        <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item" data-nav="casino">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+          Casino
+        </a>
+        <a href="originals.html" class="nav-item active" data-nav="originals">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Originals
+        </a>
+        <a href="index.html" class="nav-item" data-nav="support">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Live Chat
+        </a>
+      </nav>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="top-header">
+        <div class="header-start">
+          <button class="hamburger" id="hamburger" aria-label="Open menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          </button>
+          <a href="originals.html" class="bj-back">← Originals</a>
+        </div>
+        <div class="header-center">
+          <div class="header-wallet">
+            <button class="wallet-balance" id="walletBalance" type="button" aria-haspopup="true" aria-expanded="false">
+              <span class="wallet-currency-icon">$</span>
+              <span class="wallet-amount" id="walletAmount">0.00</span>
+              <svg class="wallet-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <button class="wallet-deposit" id="walletDeposit" type="button">Deposit</button>
+            <div class="wallet-dropdown" id="walletDropdown" hidden>
+              <button type="button" class="wallet-option active" data-currency="USD" data-amount="0.00">USD — $0.00</button>
+              <button type="button" class="wallet-option" data-currency="BTC" data-amount="0.00000000">BTC — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="ETH" data-amount="0.00000000">ETH — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="LTC" data-amount="0.00000000">LTC — 0.00000000</button>
+            </div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost">Log In</button>
+          <button class="btn btn-primary">Register</button>
+        </div>
+      </header>
+
+      <div class="bj-game">
+        <aside class="bj-panel">
+          <div class="bj-tabs">
+            <button type="button" class="bj-tab active" id="bjTabStandard">Standard</button>
+            <button type="button" class="bj-tab" id="bjTabSideBets">Side Bets <span class="bj-tab-badge">NEW</span></button>
+          </div>
+
+          <div class="bj-field">
+            <div class="bj-field-head">
+              <label for="bjBet">Bet Amount</label>
+              <span id="bjBetCurrency">0.00 USD</span>
+            </div>
+            <div class="bj-bet-row">
+              <div class="bj-bet-input-wrap">
+                <span class="bj-bet-icon">$</span>
+                <input type="number" id="bjBet" class="bj-bet-input" min="0" step="0.01" value="10" placeholder="0.00">
+              </div>
+              <button type="button" class="bj-bet-adjust" id="bjHalf">1/2</button>
+              <button type="button" class="bj-bet-adjust" id="bjDouble">2x</button>
+            </div>
+          </div>
+
+          <div class="bj-side-fields" id="bjSideFields" hidden>
+            <div class="bj-field">
+              <div class="bj-field-head">
+                <label for="bjPerfectPairs">Perfect Pairs</label>
+                <span id="bjPerfectPairsCurrency">0.00 USD</span>
+              </div>
+              <div class="bj-bet-row">
+                <div class="bj-bet-input-wrap">
+                  <span class="bj-bet-icon">$</span>
+                  <input type="number" id="bjPerfectPairs" class="bj-bet-input" min="0" step="0.01" value="0" placeholder="0.00">
+                </div>
+                <button type="button" class="bj-bet-adjust" id="bjPerfectPairsHalf">1/2</button>
+                <button type="button" class="bj-bet-adjust" id="bjPerfectPairsDouble">2x</button>
+              </div>
+            </div>
+
+            <div class="bj-field">
+              <div class="bj-field-head">
+                <label for="bj21Plus3">21+3</label>
+                <span id="bj21Plus3Currency">0.00 USD</span>
+              </div>
+              <div class="bj-bet-row">
+                <div class="bj-bet-input-wrap">
+                  <span class="bj-bet-icon">$</span>
+                  <input type="number" id="bj21Plus3" class="bj-bet-input" min="0" step="0.01" value="0" placeholder="0.00">
+                </div>
+                <button type="button" class="bj-bet-adjust" id="bj21Plus3Half">1/2</button>
+                <button type="button" class="bj-bet-adjust" id="bj21Plus3Double">2x</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="bj-actions">
+            <button type="button" class="bj-action" id="bjHit" disabled>Hit</button>
+            <button type="button" class="bj-action" id="bjStand" disabled>Stand</button>
+            <button type="button" class="bj-action" id="bjSplit" disabled>Split</button>
+            <button type="button" class="bj-action" id="bjDoubleDown" disabled>Double</button>
+          </div>
+
+          <div class="bj-field">
+            <label for="bjMode">Mode</label>
+            <select id="bjMode" class="bj-select">
+              <option>Classic</option>
+            </select>
+          </div>
+
+          <button type="button" class="bj-place-bet" id="bjPlaceBet">Place Bet</button>
+          <p class="bj-message" id="bjMessage"></p>
+        </aside>
+
+        <main class="bj-table">
+          <div class="bj-deck" aria-hidden="true"></div>
+
+          <div class="bj-dealer">
+            <div class="bj-hand-label">Dealer <span id="bjDealerScore"></span></div>
+            <div class="bj-cards" id="bjDealerCards"></div>
+          </div>
+
+          <div class="bj-rules" id="bjRules">
+            <div class="bj-rules-box">BLACKJACK 3:2 • INSURANCE 2:1</div>
+            <p>DEALER STANDS ON 17</p>
+          </div>
+
+          <div class="bj-player">
+            <div class="bj-hand-label">You <span id="bjPlayerScore"></span></div>
+            <div class="bj-cards" id="bjPlayerCards"></div>
+          </div>
+
+          <div class="bj-result-popup" id="bjResultPopup" hidden>
+            <div class="bj-result-popup-card" id="bjResultCard">
+              <p class="bj-result-popup-label" id="bjPopupLabel"></p>
+              <div class="bj-result-popup-main" id="bjPopupMain"></div>
+              <p class="bj-result-popup-text" id="bjPopupText"></p>
+            </div>
+          </div>
+
+          <div class="bj-footer">
+            <span class="bj-brand">NBD</span>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <script src="js/common.js"></script>
+  <script src="js/blackjack.js"></script>
+</body>
+</html>

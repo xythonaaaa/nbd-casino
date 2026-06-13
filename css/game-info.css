@@ -1,0 +1,346 @@
+.gi-panel {
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  padding: 28px 24px 40px;
+}
+
+.gi-panel-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.gi-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gi-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gi-cover-emoji {
+  font-size: 3rem;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35));
+}
+
+.gi-category {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.gi-game-name {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.gi-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.gi-stat {
+  padding: 12px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.gi-stat-label {
+  display: block;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.gi-stat-value {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.gi-content {
+  min-width: 0;
+}
+
+.gi-title {
+  font-size: clamp(1.125rem, 2.5vw, 1.5rem);
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  line-height: 1.3;
+}
+
+.gi-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.gi-tab {
+  padding: 10px 18px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: all var(--transition);
+}
+
+.gi-tab:hover {
+  color: var(--text-secondary);
+  border-color: var(--border-hover);
+}
+
+.gi-tab.active {
+  color: #fff;
+  background: linear-gradient(180deg, var(--accent-light) 0%, var(--accent) 100%);
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(147, 51, 234, 0.35);
+}
+
+.gi-tab-panel {
+  animation: giFadeIn 0.2s ease;
+}
+
+.gi-tab-panel[hidden] {
+  display: none !important;
+}
+
+@keyframes giFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.gi-empty {
+  padding: 32px 20px;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+
+.gi-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.gi-table thead th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.gi-table tbody td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.gi-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.gi-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.gi-medal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.gi-medal--gold { background: linear-gradient(180deg, #fde047, #ca8a04); }
+.gi-medal--silver { background: linear-gradient(180deg, #e2e8f0, #64748b); }
+.gi-medal--bronze { background: linear-gradient(180deg, #fdba74, #c2410c); }
+
+.gi-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.gi-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gi-user-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  border-radius: 8px;
+  font-size: 0.625rem;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.gi-user-icon--hidden {
+  background: var(--bg-card-hover);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.gi-user-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.gi-user-name--hidden {
+  color: var(--text-muted);
+}
+
+.gi-mult {
+  font-weight: 700;
+  color: var(--accent-light);
+}
+
+.gi-payout {
+  font-weight: 700;
+  color: #4ade80;
+}
+
+.gi-date {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.gi-desc {
+  padding: 20px 22px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.gi-desc-lead {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.gi-desc p {
+  margin-bottom: 14px;
+}
+
+.gi-desc-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 900px) {
+  .gi-panel-inner {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .gi-sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .gi-cover {
+    width: 72px;
+    aspect-ratio: 1;
+  }
+
+  .gi-cover-emoji {
+    font-size: 1.75rem;
+  }
+
+  .gi-stats {
+    flex: 1;
+    min-width: 180px;
+  }
+
+  .gi-table {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .gi-panel {
+    padding: 20px 12px 32px;
+  }
+
+  .gi-table thead {
+    display: none;
+  }
+
+  .gi-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .gi-table tbody td {
+    border: none;
+    padding: 2px 0;
+  }
+
+  .gi-table tbody td:first-child {
+    grid-column: 1 / -1;
+  }
+}

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wheel | NBD Casino</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/wheel.css">
+</head>
+<body data-page="originals">
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="logo">
+          <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
+            <path d="M16 2L28 9V23L16 30L4 23V9L16 2Z" fill="url(#logoGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+            <path d="M16 8L22 11.5V18.5L16 22L10 18.5V11.5L16 8Z" fill="rgba(255,255,255,0.9)"/>
+            <defs>
+              <linearGradient id="logoGrad" x1="4" y1="2" x2="28" y2="30">
+                <stop stop-color="#9333ea"/>
+                <stop offset="1" stop-color="#000000"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="logo-text">NBD Casino</span>
+        </a>
+        <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item" data-nav="casino">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+          Casino
+        </a>
+        <a href="originals.html" class="nav-item active" data-nav="originals">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Originals
+        </a>
+      </nav>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="top-header">
+        <div class="header-start">
+          <button class="hamburger" id="hamburger" aria-label="Open menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          </button>
+          <a href="originals.html" class="wh-back">← Originals</a>
+        </div>
+        <div class="header-center">
+          <div class="header-wallet">
+            <button class="wallet-balance" id="walletBalance" type="button" aria-haspopup="true" aria-expanded="false">
+              <span class="wallet-currency-icon">$</span>
+              <span class="wallet-amount" id="walletAmount">0.00</span>
+              <svg class="wallet-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <button class="wallet-deposit" id="walletDeposit" type="button">Deposit</button>
+            <div class="wallet-dropdown" id="walletDropdown" hidden>
+              <button type="button" class="wallet-option active" data-currency="USD" data-amount="0.00">USD — $0.00</button>
+              <button type="button" class="wallet-option" data-currency="BTC" data-amount="0.00000000">BTC — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="ETH" data-amount="0.00000000">ETH — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="LTC" data-amount="0.00000000">LTC — 0.00000000</button>
+            </div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost">Log In</button>
+          <button class="btn btn-primary">Register</button>
+        </div>
+      </header>
+
+      <div class="wh-game">
+        <aside class="wh-panel">
+          <div class="wh-field">
+            <div class="wh-field-head">
+              <label for="whBet">Bet Amount</label>
+              <span id="whBetCurrency">0.00 USD</span>
+            </div>
+            <div class="wh-bet-row">
+              <div class="wh-bet-input-wrap">
+                <span class="wh-bet-icon">$</span>
+                <input type="number" id="whBet" class="wh-bet-input" min="0" step="0.01" value="10" placeholder="0.00">
+              </div>
+              <button type="button" class="wh-bet-adjust" id="whHalf">1/2</button>
+              <button type="button" class="wh-bet-adjust" id="whDouble">2x</button>
+            </div>
+          </div>
+
+          <div class="wh-field">
+            <label>Risk Level</label>
+            <div class="wh-risk-row" id="whRiskRow">
+              <button type="button" class="wh-risk active" data-risk="low">Low</button>
+              <button type="button" class="wh-risk" data-risk="medium">Med</button>
+              <button type="button" class="wh-risk" data-risk="hard">Hard</button>
+            </div>
+          </div>
+
+          <div class="wh-stats">
+            <div class="wh-stat">
+              <span class="wh-stat-label">Segments</span>
+              <span class="wh-stat-value" id="whSegments">10</span>
+            </div>
+            <div class="wh-stat">
+              <span class="wh-stat-label">Max Win</span>
+              <span class="wh-stat-value wh-stat-value--pink" id="whMaxWin">3.00x</span>
+            </div>
+            <div class="wh-stat">
+              <span class="wh-stat-label">Profit on Win</span>
+              <span class="wh-stat-value wh-stat-value--purple" id="whProfit">+$0.00</span>
+            </div>
+          </div>
+
+          <button type="button" class="wh-action" id="whSpinBtn">Spin Wheel</button>
+          <p class="wh-message" id="whMessage"></p>
+        </aside>
+
+        <main class="wh-board">
+          <div class="wh-board-inner">
+            <div class="wh-wheel-wrap">
+              <div class="wh-pointer" aria-hidden="true"></div>
+              <canvas id="whCanvas" class="wh-canvas" aria-label="Prize wheel"></canvas>
+              <div class="wh-wheel-hub" aria-hidden="true"></div>
+            </div>
+            <div class="wh-result" id="whResult" hidden>
+              <span class="wh-result-label" id="whResultLabel">You won</span>
+              <span class="wh-result-mult" id="whResultMult">2.00x</span>
+              <span class="wh-result-payout" id="whResultPayout">+$20.00</span>
+            </div>
+            <div class="wh-legend" id="whLegend"></div>
+          </div>
+          <div class="wh-footer">
+            <span class="wh-brand">NBD</span>
+          </div>
+        </main>
+
+        <aside class="wh-history" aria-label="Recent spins">
+          <span class="wh-history-head">Recent</span>
+          <div class="wh-history-list" id="whHistoryList">
+            <p class="wh-history-empty">No spins yet</p>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <script src="js/common.js"></script>
+  <script src="js/wheel.js"></script>
+</body>
+</html>

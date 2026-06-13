@@ -1,0 +1,232 @@
+.vip-main {
+  max-width: 640px;
+}
+
+.vip-current {
+  padding: 20px;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, rgba(147, 51, 234, 0.12), rgba(0, 0, 0, 0.4));
+  border: 1px solid rgba(147, 51, 234, 0.25);
+  border-radius: 14px;
+}
+
+.vip-current-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.vip-current-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fbbf24;
+}
+
+.vip-current-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.vip-current-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.vip-current-rank {
+  display: block;
+  font-size: 1.375rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.vip-current-wagered {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.vip-current-wagered strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.vip-progress-wrap {
+  margin-top: 4px;
+}
+
+.vip-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.vip-progress-labels strong {
+  color: var(--accent-light);
+  font-weight: 700;
+}
+
+.vip-progress-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.vip-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-dark), var(--accent-light));
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.vip-current-max {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--accent-light);
+}
+
+.vip-ladder-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.vip-ladder-head-meta {
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-secondary);
+}
+
+.vip-ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vip-rank {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.vip-rank.is-current {
+  background: rgba(147, 51, 234, 0.1);
+  border-color: rgba(147, 51, 234, 0.45);
+  box-shadow: 0 0 0 1px rgba(147, 51, 234, 0.15);
+}
+
+.vip-rank.is-achieved {
+  opacity: 0.72;
+}
+
+.vip-rank.is-locked {
+  opacity: 0.45;
+}
+
+.vip-rank-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.vip-rank-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.vip-rank-name {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.vip-rank-req {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.vip-rank-perks {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.vip-rank-reward {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fbbf24;
+  margin-bottom: 2px;
+}
+
+.vip-rank-rake {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.vip-rank-badge {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 999px;
+  background: rgba(147, 51, 234, 0.25);
+  color: var(--accent-light);
+  border: 1px solid rgba(147, 51, 234, 0.35);
+}
+
+.vip-rank-check {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .vip-rank-perks {
+    display: none;
+  }
+
+  .vip-current-top {
+    flex-direction: column;
+  }
+}

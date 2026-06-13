@@ -33,9 +33,16 @@ body[data-page="originals"] .main-content > * {
   z-index: 1;
 }
 
-/* Header — velvet bar with gold trim */
+body[data-page="casino"] .main-content > .live-wins,
+body[data-page="originals"] .main-content > .live-wins {
+  z-index: 0;
+}
+
+/* Header — always above page content and animated tickers */
 body[data-page="casino"] .top-header,
 body[data-page="originals"] .top-header {
+  z-index: 1000;
+  isolation: isolate;
   background: rgba(4, 0, 10, 0.94);
   border-bottom: 1px solid rgba(253, 224, 71, 0.12);
   box-shadow: 0 4px 32px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(147, 51, 234, 0.15);
@@ -472,9 +479,13 @@ body[data-page="originals"] .main-wrapper:has([class$="-game"])::before {
   z-index: 0;
 }
 
-body[data-page="originals"] .main-wrapper:has([class$="-game"]) > * {
+body[data-page="originals"] .main-wrapper:has([class$="-game"]) > *:not(.top-header) {
   position: relative;
   z-index: 1;
+}
+
+body[data-page="originals"] .main-wrapper:has([class$="-game"]) > .top-header {
+  z-index: 1000;
 }
 
 /* Game layout containers */

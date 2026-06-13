@@ -1030,6 +1030,102 @@ const REF_LOCAL_KEY = 'xython-ref-pending-local';
 const AFFILIATE_STORE_KEY = 'xython-affiliate-store';
 const AFFILIATE_COMMISSION_RATE = 0.05;
 const AFFILIATE_MIN_CLAIM = 0.01;
+const AFFILIATE_POLL_MS = 5000;
+
+let affiliateCache = {};
+let affiliateUsingServer = false;
+let affiliatePollTimer = null;
+
+function getAffiliateApiUrl() {
+  if (window.NBD_AFFILIATE_API) return window.NBD_AFFILIATE_API;
+  if (location.protocol === 'http:' || location.protocol === 'https:') {
+    return `${location.origin}/api/affiliates`;
+  }
+  return null;
+}
+
+async function postAffiliateAction(payload) {
+  const url = getAffiliateApiUrl();
+  if (!url) return null;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchAffiliateFromServer(username) {
+  const url = getAffiliateApiUrl();
+  if (!url || !username) return null;
+  try {
+    const res = await fetch(`${url}?user=${encodeURIComponent(username)}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+async function registerUserOnServer(username) {
+  const result = await postAffiliateAction({ action: 'register', username });
+  return !!result?.ok;
+}
+
+async function checkReferrerExists(code) {
+  const trimmed = (code || '').trim();
+  if (!trimmed) return false;
+
+  const url = getAffiliateApiUrl();
+  if (url) {
+    try {
+      const res = await fetch(`${url}?exists=${encodeURIComponent(trimmed)}`);
+      if (res.ok) {
+        const data = await res.json();
+        return !!data.exists;
+      }
+    } catch { /* fall through */ }
+  }
+  return isRegisteredUser(trimmed);
+}
+
+async function refreshAffiliateData(username) {
+  const name = username || getLoggedInUsername();
+  if (!name) return null;
+
+  const remote = await fetchAffiliateFromServer(name);
+  if (remote !== null) {
+    affiliateUsingServer = true;
+    affiliateCache[name.toLowerCase()] = remote;
+    document.dispatchEvent(new CustomEvent('xython:affiliate-change'));
+    return remote;
+  }
+
+  affiliateUsingServer = false;
+  return getAffiliateDataLocal(name);
+}
+
+function startAffiliatePolling() {
+  const username = getLoggedInUsername();
+  if (!username) return;
+
+  refreshAffiliateData(username);
+  if (affiliatePollTimer) clearInterval(affiliatePollTimer);
+  affiliatePollTimer = setInterval(() => {
+    const user = getLoggedInUsername();
+    if (user) refreshAffiliateData(user);
+  }, AFFILIATE_POLL_MS);
+}
+
+async function syncCurrentUserToServer() {
+  const username = getLoggedInUsername();
+  if (username) await registerUserOnServer(username);
+}
 
 function loadRegisteredUsers() {
   try {
@@ -1139,6 +1235,7 @@ async function createAccount(username, password) {
   };
   saveAccounts(accounts);
   markUserRegistered(username);
+  registerUserOnServer(username);
 }
 
 function backfillRegisteredUsers() {
@@ -1208,8 +1305,13 @@ function clearPendingReferralCode() {
 }
 
 function getUserReferrer(username) {
+  const name = username || getLoggedInUsername();
+  if (affiliateUsingServer && name) {
+    const cached = affiliateCache[name.toLowerCase()];
+    if (cached?.referrer) return cached.referrer;
+  }
   const store = loadAffiliateStore();
-  const key = (username || '').toLowerCase();
+  const key = (name || '').toLowerCase();
   return store.referralMap[key] || null;
 }
 
@@ -1304,6 +1406,22 @@ function saveAffiliateStore(store) {
 }
 
 function getAffiliateData(username) {
+  const name = username || getLoggedInUsername();
+  if (affiliateUsingServer && name) {
+    const cached = affiliateCache[name.toLowerCase()];
+    if (cached) {
+      return {
+        pending: cached.pending || 0,
+        lifetime: cached.lifetime || 0,
+        referralWagered: cached.referralWagered || 0,
+        referrals: [...(cached.referrals || [])],
+      };
+    }
+  }
+  return getAffiliateDataLocal(name);
+}
+
+function getAffiliateDataLocal(username) {
   const store = loadAffiliateStore();
   const name = username || getLoggedInUsername();
   const entry = getAffiliateEntry(store, name);
@@ -1332,7 +1450,7 @@ function getAffiliateData(username) {
   return data;
 }
 
-function linkReferral(newUsername, referrerRaw) {
+function linkReferralLocal(newUsername, referrerRaw) {
   const code = (referrerRaw || '').trim();
   if (!code) return null;
 
@@ -1369,11 +1487,39 @@ function linkReferral(newUsername, referrerRaw) {
   return referrer;
 }
 
+async function linkReferral(newUsername, referrerRaw) {
+  const code = (referrerRaw || '').trim();
+  if (!code) return null;
+
+  const newUser = (newUsername || '').trim();
+  const referrer = resolveUsername(code) || code;
+  if (!newUser || !referrer) return null;
+  if (validateUsername(code)) return null;
+  if (validateUsername(newUser)) return null;
+  if (referrer.toLowerCase() === newUser.toLowerCase()) return null;
+
+  const url = getAffiliateApiUrl();
+  if (url) {
+    const result = await postAffiliateAction({ action: 'link', newUser, referrer: code });
+    if (result?.ok) {
+      clearPendingReferralCode();
+      await registerUserOnServer(newUser);
+      await refreshAffiliateData(newUser);
+      await refreshAffiliateData(referrer);
+      document.dispatchEvent(new CustomEvent('xython:affiliate-change'));
+      return result.data.referrer || referrer;
+    }
+    if (result && !result.ok) return null;
+  }
+
+  return linkReferralLocal(newUsername, referrerRaw);
+}
+
 function applyReferralOnSignup(newUsername) {
   return linkReferral(newUsername, getPendingReferralCode());
 }
 
-function accrueAffiliateCommission(wageredAmount) {
+function accrueAffiliateCommissionLocal(wageredAmount) {
   const amount = parseFloat(wageredAmount) || 0;
   if (amount <= 0) return;
 
@@ -1402,6 +1548,16 @@ function accrueAffiliateCommission(wageredAmount) {
   document.dispatchEvent(new CustomEvent('xython:affiliate-change'));
 }
 
+function accrueAffiliateCommission(wageredAmount) {
+  accrueAffiliateCommissionLocal(wageredAmount);
+
+  const username = getLoggedInUsername();
+  const amount = parseFloat(wageredAmount) || 0;
+  if (!username || amount <= 0) return;
+
+  postAffiliateAction({ action: 'wager', username, amount });
+}
+
 function getReferralLink(username) {
   const name = resolveUsername(username || getLoggedInUsername()) || username;
   const code = encodeURIComponent(name);
@@ -1410,11 +1566,39 @@ function getReferralLink(username) {
     const indexUrl = current.replace(/[^/\\]+$/, 'index.html');
     return `${indexUrl}?ref=${code}`;
   }
-  const base = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}`;
-  return `${base}index.html?ref=${code}`;
+  return `${window.location.origin}/?ref=${code}`;
 }
 
-function claimAffiliateCommission(username) {
+async function claimAffiliateCommission(username) {
+  const name = username || getLoggedInUsername();
+  if (!name) return 0;
+
+  const url = getAffiliateApiUrl();
+  if (url) {
+    const result = await postAffiliateAction({ action: 'claim', username: name });
+    if (result?.ok) {
+      const pending = parseFloat(result.data?.claimed) || 0;
+      if (pending >= AFFILIATE_MIN_CLAIM) {
+        const currency = window.XythonWallet?.getActiveCurrency?.() || 'USD';
+        const balance = window.XythonWallet?.getBalance?.(currency) ?? 0;
+        window.XythonWallet?.setBalance?.(currency, balance + pending, {
+          type: 'reward',
+          label: 'Affiliate',
+          detail: `Claimed $${pending.toFixed(2)} affiliate commission`,
+        });
+        await refreshAffiliateData(name);
+        document.dispatchEvent(new CustomEvent('xython:affiliate-change'));
+        return pending;
+      }
+      return 0;
+    }
+    if (affiliateUsingServer) return 0;
+  }
+
+  return claimAffiliateCommissionLocal(name);
+}
+
+function claimAffiliateCommissionLocal(username) {
   const store = loadAffiliateStore();
   const entry = getAffiliateEntry(store, username || getLoggedInUsername());
   if (!entry) return 0;
@@ -1448,6 +1632,8 @@ window.XythonAffiliates = {
   claim: username => claimAffiliateCommission(username || getLoggedInUsername()),
   link: linkReferral,
   getReferrer: username => getUserReferrer(username || getLoggedInUsername()),
+  refresh: refreshAffiliateData,
+  isShared: () => affiliateUsingServer,
 };
 
 function clearUser() {
@@ -2164,9 +2350,9 @@ function initAuthModal() {
           affiliateInput?.focus();
           return;
         }
-        linkedReferrer = linkReferral(username, affCode);
-        if (!linkedReferrer) {
-          errorEl.textContent = `Could not link affiliate code "${affCode}" — check spelling and try again`;
+        const referrerExists = await checkReferrerExists(affCode);
+        if (!referrerExists) {
+          errorEl.textContent = `Affiliate code "${affCode}" not found — check spelling and try again`;
           errorEl.hidden = false;
           successEl.hidden = true;
           affiliateInput?.focus();
@@ -2183,6 +2369,17 @@ function initAuthModal() {
         successEl.hidden = true;
         submitBtn.disabled = false;
         return;
+      }
+
+      if (!alreadyReferred && affCode) {
+        linkedReferrer = await linkReferral(username, affCode);
+        if (!linkedReferrer) {
+          errorEl.textContent = `Could not link affiliate code "${affCode}" — check spelling and try again`;
+          errorEl.hidden = false;
+          successEl.hidden = true;
+          submitBtn.disabled = false;
+          return;
+        }
       }
       submitBtn.disabled = false;
 
@@ -2228,6 +2425,13 @@ function initAuthModal() {
 
     saveUser(username);
     notifyAuthChange();
+    syncCurrentUserToServer();
+    if (!getUserReferrer(username)) {
+      const affCode = getPendingReferralCode().trim();
+      if (affCode && affCode.toLowerCase() !== username.toLowerCase()) {
+        linkReferral(username, affCode);
+      }
+    }
     successEl.textContent = `Welcome back, ${username}!`;
     successEl.hidden = false;
     errorEl.hidden = true;
@@ -3032,6 +3236,15 @@ function initCommon() {
   initPanelTabs();
   initChat();
   startLeaderboardPolling();
+  startAffiliatePolling();
+  syncCurrentUserToServer();
+  if (!initCommon.affiliateAuthBound) {
+    document.addEventListener('xython:auth-change', () => {
+      syncCurrentUserToServer();
+      startAffiliatePolling();
+    });
+    initCommon.affiliateAuthBound = true;
+  }
   initLiveBets();
   initCasinoThemeLoader();
   initGameInfoLoader();

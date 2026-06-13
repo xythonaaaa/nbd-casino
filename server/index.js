@@ -15,6 +15,10 @@ const AFFILIATE_COMMISSION_RATE = 0.05;
 const AFFILIATE_MIN_CLAIM = 0.01;
 const WALLET_ADMIN_USERNAMES = ['ceo'];
 const WALLET_CURRENCIES = ['USD', 'BTC', 'ETH', 'LTC'];
+const ORIGINALS_GAMES = new Set([
+  'blackjack', 'plinko', 'roulette', 'dice', 'mines', 'crash',
+  'keno', 'limbo', 'war', 'coinflip', 'hilo', 'tower', 'wheel',
+]);
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -294,7 +298,7 @@ function defaultWalletBalances() {
 }
 
 function defaultWalletStore() {
-  return { users: [], grants: {} };
+  return { users: [], grants: {}, resetAt: 0 };
 }
 
 function loadWalletStore() {
@@ -303,6 +307,7 @@ function loadWalletStore() {
     return {
       users: Array.isArray(parsed.users) ? parsed.users : [],
       grants: parsed.grants && typeof parsed.grants === 'object' ? parsed.grants : {},
+      resetAt: Math.max(0, parseInt(parsed.resetAt, 10) || 0),
     };
   } catch {
     return defaultWalletStore();
@@ -357,17 +362,40 @@ function sendWalletMoney(store, admin, to, amount, currency) {
   return { ok: true, to: recipient, amount: amt, currency: cur, grants: getWalletGrants(store, recipient) };
 }
 
+function resetAllWallets(store) {
+  store.grants = {};
+  store.resetAt = Date.now();
+  return { ok: true, resetAt: store.resetAt };
+}
+
+function resetOriginalsLeaderboard(data) {
+  data.wins = data.wins.filter(w => !ORIGINALS_GAMES.has(w.game));
+  ORIGINALS_GAMES.forEach(game => {
+    data.bets[game] = 0;
+  });
+  data.recentBets = data.recentBets.filter(b => !ORIGINALS_GAMES.has(b.game));
+  return data;
+}
+
 function handleWalletRequest(req, res, urlPath) {
   const query = new URL(`http://local${urlPath}`).searchParams;
 
   if (req.method === 'GET') {
+    const store = loadWalletStore();
+    if (query.get('meta') === 'resetAt') {
+      sendJson(res, 200, { resetAt: store.resetAt || 0 });
+      return;
+    }
+
     const user = query.get('user') || '';
     if (!user.trim()) {
       sendJson(res, 400, { error: 'Missing user' });
       return;
     }
-    const store = loadWalletStore();
-    sendJson(res, 200, { grants: getWalletGrants(store, user) });
+    sendJson(res, 200, {
+      grants: getWalletGrants(store, user),
+      resetAt: store.resetAt || 0,
+    });
     return;
   }
 
@@ -394,6 +422,12 @@ function handleWalletRequest(req, res, urlPath) {
             sendJson(res, result.error === 'Admin only' ? 403 : 400, result);
             return;
           }
+        } else if (action === 'reset-all') {
+          if (!isWalletAdmin(payload.admin)) {
+            sendJson(res, 403, { error: 'Admin only' });
+            return;
+          }
+          result = resetAllWallets(store);
         } else {
           sendJson(res, 400, { error: 'Unknown action' });
           return;
@@ -541,6 +575,19 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const payload = JSON.parse(body || '{}');
+
+        if (payload.action === 'reset-originals') {
+          if (!isWalletAdmin(payload.admin)) {
+            sendJson(res, 403, { error: 'Admin only' });
+            return;
+          }
+          const data = loadLeaderboard();
+          resetOriginalsLeaderboard(data);
+          saveLeaderboard(data);
+          sendJson(res, 200, { ok: true, reset: 'originals', ...data });
+          return;
+        }
+
         const data = appendLeaderboardRound(payload);
         if (!data) {
           sendJson(res, 400, { error: 'Invalid game' });

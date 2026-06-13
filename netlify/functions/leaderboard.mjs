@@ -3,6 +3,25 @@ import { getStore } from '@netlify/blobs';
 const MAX_WINS = 500;
 const MAX_RECENT_BETS = 100;
 const STORE_KEY = 'data';
+const ADMIN_USERNAMES = ['ceo'];
+const ORIGINALS_GAMES = new Set([
+  'blackjack', 'plinko', 'roulette', 'dice', 'mines', 'crash',
+  'keno', 'limbo', 'war', 'coinflip', 'hilo', 'tower', 'wheel',
+]);
+
+function isAdmin(username) {
+  const name = String(username || '').trim().toLowerCase();
+  return ADMIN_USERNAMES.some(u => u.toLowerCase() === name);
+}
+
+function resetOriginalsLeaderboard(data) {
+  data.wins = data.wins.filter(w => !ORIGINALS_GAMES.has(w.game));
+  ORIGINALS_GAMES.forEach(game => {
+    data.bets[game] = 0;
+  });
+  data.recentBets = data.recentBets.filter(b => !ORIGINALS_GAMES.has(b.game));
+  return data;
+}
 
 function defaultData() {
   return { wins: [], bets: {}, recentBets: [] };
@@ -45,6 +64,16 @@ export default async (req) => {
       payload = await req.json();
     } catch {
       return Response.json({ error: 'Bad request' }, { status: 400 });
+    }
+
+    if (payload.action === 'reset-originals') {
+      if (!isAdmin(payload.admin)) {
+        return Response.json({ error: 'Admin only' }, { status: 403 });
+      }
+      const data = await loadData(store);
+      resetOriginalsLeaderboard(data);
+      await saveData(store, data);
+      return Response.json({ ok: true, reset: 'originals', ...data });
     }
 
     const game = String(payload.game || '').trim().slice(0, 32);

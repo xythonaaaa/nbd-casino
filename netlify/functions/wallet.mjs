@@ -9,7 +9,7 @@ function defaultBalances() {
 }
 
 function defaultStore() {
-  return { users: [], grants: {} };
+  return { users: [], grants: {}, resetAt: 0 };
 }
 
 function normalizeStore(raw) {
@@ -17,6 +17,7 @@ function normalizeStore(raw) {
   return {
     users: Array.isArray(data.users) ? data.users : [],
     grants: data.grants && typeof data.grants === 'object' ? data.grants : {},
+    resetAt: Math.max(0, parseInt(data.resetAt, 10) || 0),
   };
 }
 
@@ -95,17 +96,32 @@ function sendMoney(store, admin, to, amount, currency) {
   return { ok: true, to: recipient, amount: amt, currency: cur, grants: getGrantsForUser(store, recipient) };
 }
 
+function resetAllWallets(store) {
+  store.grants = {};
+  store.resetAt = Date.now();
+  return { ok: true, resetAt: store.resetAt };
+}
+
 export default async (req) => {
   const store = getStore({ name: 'nbd-wallet', consistency: 'strong' });
 
   if (req.method === 'GET') {
     const url = new URL(req.url);
+    const meta = url.searchParams.get('meta');
+    const data = await loadStore(store);
+
+    if (meta === 'resetAt') {
+      return Response.json({ resetAt: data.resetAt || 0 });
+    }
+
     const user = url.searchParams.get('user') || '';
     if (!user.trim()) {
       return Response.json({ error: 'Missing user' }, { status: 400 });
     }
-    const data = await loadStore(store);
-    return Response.json({ grants: getGrantsForUser(data, user) });
+    return Response.json({
+      grants: getGrantsForUser(data, user),
+      resetAt: data.resetAt || 0,
+    });
   }
 
   if (req.method === 'POST') {
@@ -124,6 +140,15 @@ export default async (req) => {
       });
       if (result.error) return Response.json(result, { status: 400 });
       return Response.json({ ok: true });
+    }
+
+    if (payload.action === 'reset-all') {
+      const result = await writeStore(store, data => {
+        if (!isAdmin(payload.admin)) return { error: 'Admin only' };
+        return resetAllWallets(data);
+      });
+      if (result.error) return Response.json(result, { status: result.error === 'Admin only' ? 403 : 400 });
+      return Response.json(result);
     }
 
     if (payload.action === 'send') {

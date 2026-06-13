@@ -19,6 +19,7 @@ function canDeposit() {
 }
 
 const GRANTS_SYNC_KEY = 'xython-grants-synced';
+const WALLET_RESET_ACK_KEY = 'xython-wallet-reset-ack';
 const WALLET_GRANTS_POLL_MS = 8000;
 const WALLET_CURRENCIES = ['USD', 'BTC', 'ETH', 'LTC'];
 
@@ -71,13 +72,58 @@ async function fetchServerGrants(username) {
   const url = getWalletApiUrl();
   if (!url || !username) return null;
   try {
-    const res = await fetch(`${url}?user=${encodeURIComponent(username)}`);
+    const res = await fetch(`${url}?user=${encodeURIComponent(username)}`, { cache: 'no-store' });
     if (!res.ok) return null;
     const data = await res.json();
+    if (data.resetAt) await applyServerWalletReset(data.resetAt);
     return data.grants && typeof data.grants === 'object' ? data.grants : null;
   } catch {
     return null;
   }
+}
+
+function loadWalletResetAck() {
+  return Math.max(0, parseInt(localStorage.getItem(WALLET_RESET_ACK_KEY), 10) || 0);
+}
+
+function saveWalletResetAck(resetAt) {
+  localStorage.setItem(WALLET_RESET_ACK_KEY, String(resetAt));
+}
+
+async function fetchWalletResetAt() {
+  const url = getWalletApiUrl();
+  if (!url) return 0;
+  try {
+    const res = await fetch(`${url}?meta=resetAt`, { cache: 'no-store' });
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return Math.max(0, parseInt(data.resetAt, 10) || 0);
+  } catch {
+    return 0;
+  }
+}
+
+async function applyServerWalletReset(resetAt) {
+  const ts = Math.max(0, parseInt(resetAt, 10) || 0);
+  if (!ts || ts <= loadWalletResetAck()) return false;
+
+  WALLET_CURRENCIES.forEach(currency => {
+    setWalletBalance(currency, 0, false);
+  });
+  saveWalletState();
+  localStorage.removeItem(GRANTS_SYNC_KEY);
+
+  const activeCurrency = document.querySelector('.wallet-option.active')?.dataset.currency || 'USD';
+  applyWalletHeaderDisplay(activeCurrency, 0);
+  saveWalletResetAck(ts);
+  document.dispatchEvent(new CustomEvent('xython:wallet-reset', { detail: { resetAt: ts } }));
+  return true;
+}
+
+async function ensureWalletResetSynced() {
+  const resetAt = await fetchWalletResetAt();
+  if (!resetAt) return;
+  await applyServerWalletReset(resetAt);
 }
 
 async function syncWalletGrantsFromServer() {
@@ -110,9 +156,13 @@ async function syncWalletGrantsFromServer() {
 }
 
 function startWalletGrantsPolling() {
+  ensureWalletResetSynced();
   syncWalletGrantsFromServer();
   if (walletGrantsPollTimer) clearInterval(walletGrantsPollTimer);
-  walletGrantsPollTimer = setInterval(syncWalletGrantsFromServer, WALLET_GRANTS_POLL_MS);
+  walletGrantsPollTimer = setInterval(() => {
+    ensureWalletResetSynced();
+    syncWalletGrantsFromServer();
+  }, WALLET_GRANTS_POLL_MS);
 }
 
 function ensureAdminWalletButtons() {
@@ -3604,6 +3654,7 @@ function initCommon() {
   initChat();
   startLeaderboardPolling();
   startAffiliatePolling();
+  ensureWalletResetSynced();
   startWalletGrantsPolling();
   syncCurrentUserToServer();
   if (!initCommon.affiliateAuthBound) {

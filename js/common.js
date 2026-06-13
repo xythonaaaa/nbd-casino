@@ -6,6 +6,23 @@ const CHAT_POLL_MS = 3000;
 const PANEL_STORAGE_KEY = 'xython-panel-open';
 const WALLET_STORAGE_KEY = 'xython-wallet';
 const VAULT_STORAGE_KEY = 'xython-vault';
+const ADMIN_USERNAMES = ['ceo'];
+
+function isAdmin(username) {
+  const name = (username || getLoggedInUsername() || '').trim().toLowerCase();
+  if (!name) return false;
+  return ADMIN_USERNAMES.some(u => u.toLowerCase() === name);
+}
+
+function canDeposit() {
+  return isLoggedIn() && isAdmin();
+}
+
+function updateDepositButtonVisibility() {
+  const depositBtn = document.getElementById('walletDeposit');
+  if (!depositBtn) return;
+  depositBtn.hidden = !canDeposit();
+}
 
 const DEFAULT_WALLET = {
   balances: { USD: 0, BTC: 0, ETH: 0, LTC: 0 },
@@ -1771,6 +1788,7 @@ function renderAuthUI() {
     `;
     wireUserMenu();
     wireRewardsMenu();
+    updateDepositButtonVisibility();
     return;
   }
 
@@ -1779,6 +1797,7 @@ function renderAuthUI() {
     <button class="btn btn-primary" type="button" id="authRegister">Register</button>
   `;
   wireAuthButtons();
+  updateDepositButtonVisibility();
 }
 
 function userMenuItem(id, label, icon, extraClass = '') {
@@ -2529,6 +2548,7 @@ window.XythonAuth = {
   getUser: getLoggedInUser,
   getUsername: getLoggedInUsername,
   isLoggedIn,
+  isAdmin,
   requireAuth,
   logout() {
     clearUser();
@@ -2662,6 +2682,7 @@ function initWallet() {
   depositBtn?.addEventListener('click', e => {
     e.stopPropagation();
     closeDropdown();
+    if (!canDeposit()) return;
     openDepositModal();
   });
 
@@ -2671,6 +2692,12 @@ function initWallet() {
     const active = document.querySelector('.wallet-option.active');
     return active?.dataset.currency || 'USD';
   }});
+
+  updateDepositButtonVisibility();
+  if (!initWallet.depositAuthBound) {
+    document.addEventListener('xython:auth-change', updateDepositButtonVisibility);
+    initWallet.depositAuthBound = true;
+  }
 
   initVaultModal({ getActiveCurrency: () => {
     const active = document.querySelector('.wallet-option.active');
@@ -2887,8 +2914,8 @@ function initDepositModal({ getActiveCurrency }) {
       <button class="deposit-close" id="depositClose" type="button" aria-label="Close">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
-      <h2 class="deposit-title" id="depositTitle">Deposit</h2>
-      <p class="deposit-subtitle">Add funds to your NBD Casino wallet</p>
+      <h2 class="deposit-title" id="depositTitle">Admin Deposit</h2>
+      <p class="deposit-subtitle">Add play money to your wallet (admin only)</p>
 
       <div class="deposit-currencies" id="depositCurrencies">
         <button type="button" class="deposit-currency active" data-currency="USD">USD</button>
@@ -2987,6 +3014,7 @@ function initDepositModal({ getActiveCurrency }) {
   }
 
   window.openDepositModal = function openDepositModal() {
+    if (!canDeposit()) return;
     const currency = getActiveCurrency();
     selectCurrency(currency);
     modal.hidden = false;
@@ -3012,6 +3040,7 @@ function initDepositModal({ getActiveCurrency }) {
   });
 
   submitBtn.addEventListener('click', () => {
+    if (!canDeposit()) return;
     const amount = parseFloat(amountInput.value);
     if (!amount || amount <= 0) {
       amountInput.focus();

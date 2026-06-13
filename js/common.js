@@ -2006,6 +2006,11 @@ function wireUserMenu() {
     openRewardsPopout();
   });
 
+  dropdown.querySelector('[data-menu="support"]')?.addEventListener('click', () => {
+    closeUserMenu();
+    window.openLiveChat?.();
+  });
+
   if (!userMenuOutsideClickBound) {
     document.addEventListener('click', () => closeUserPopout());
     document.addEventListener('keydown', e => {

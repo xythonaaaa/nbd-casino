@@ -1,152 +1,250 @@
-document.addEventListener('DOMContentLoaded', async () => {
-  initCommon();
+import { getStore } from '@netlify/blobs';
 
-  if (!window.XythonAuth?.isLoggedIn?.()) {
-    window.XythonAuth?.requireAuth?.('login');
-    return;
-  }
+const STORE_KEY = 'data';
+const COMMISSION_RATE = 0.05;
+const MIN_CLAIM = 0.01;
 
-  document.getElementById('affCopyBtn')?.addEventListener('click', copyReferralLink);
-  document.getElementById('affClaimBtn')?.addEventListener('click', claimCommission);
-  document.addEventListener('xython:affiliate-change', renderAffiliates);
-  document.addEventListener('xython:auth-change', () => {
-    window.XythonAffiliates?.refresh?.().then(() => renderAffiliates());
-  });
-
-  await window.XythonAffiliates?.refresh?.();
-  renderAffiliates();
-});
-
-function formatMoney(value) {
-  return `$${Number(value || 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+function defaultAffiliateData() {
+  return { pending: 0, lifetime: 0, referralWagered: 0, referrals: [] };
 }
 
-function formatDate(ts) {
-  return new Date(ts).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+function defaultStore() {
+  return { users: [], referralMap: {}, affiliates: {} };
 }
 
-function renderAffiliates() {
-  const username = window.XythonAuth?.getUsername?.();
-  if (!username) return;
-
-  const aff = window.XythonAffiliates;
-  const data = aff.get(username);
-  const rate = (aff.rate * 100).toFixed(0);
-  const link = aff.getLink(username);
-  const referrer = aff.getReferrer(username);
-  const minClaim = aff.minClaim;
-
-  const rateLabel = document.getElementById('affRateLabel');
-  if (rateLabel) rateLabel.textContent = `${rate}%`;
-
-  const statsEl = document.getElementById('affStats');
-  if (statsEl) {
-    statsEl.innerHTML = `
-      <div class="aff-stat">
-        <span class="aff-stat-value">${data.referrals.length}</span>
-        <span class="aff-stat-label">Referrals</span>
-      </div>
-      <div class="aff-stat">
-        <span class="aff-stat-value aff-stat-value--purple">${formatMoney(data.referralWagered)}</span>
-        <span class="aff-stat-label">Referral Wagered</span>
-      </div>
-      <div class="aff-stat">
-        <span class="aff-stat-value aff-stat-value--green">${formatMoney(data.pending)}</span>
-        <span class="aff-stat-label">Available</span>
-      </div>
-      <div class="aff-stat">
-        <span class="aff-stat-value">${formatMoney(data.lifetime)}</span>
-        <span class="aff-stat-label">Lifetime</span>
-      </div>`;
-  }
-
-  const linkInput = document.getElementById('affLinkInput');
-  if (linkInput) linkInput.value = link;
-
-  const isLocalFile = window.location.protocol === 'file:';
-  const tipEl = document.getElementById('affLocalTip');
-  const codeHint = document.getElementById('affCodeHint');
-  if (tipEl) tipEl.hidden = !isLocalFile;
-  if (codeHint) codeHint.textContent = username;
-
-  const referredByEl = document.getElementById('affReferredBy');
-  if (referredByEl) {
-    if (referrer) {
-      referredByEl.hidden = false;
-      referredByEl.innerHTML = `You were referred by <strong>${escapeHtml(referrer)}</strong>`;
-    } else {
-      referredByEl.hidden = true;
-    }
-  }
-
-  const pendingDesc = document.getElementById('affPendingDesc');
-  if (pendingDesc) {
-    pendingDesc.textContent = `${formatMoney(data.pending)} available · ${rate}% of referral wagers`;
-  }
-
-  const claimBtn = document.getElementById('affClaimBtn');
-  if (claimBtn) {
-    claimBtn.disabled = (data.pending || 0) < minClaim;
-    claimBtn.textContent = (data.pending || 0) >= minClaim ? 'Claim' : 'Nothing to claim';
-  }
-
-  const listEl = document.getElementById('affReferrals');
-  if (!listEl) return;
-
-  if (!data.referrals.length) {
-    listEl.innerHTML = '<p class="aff-empty">No referrals yet. Share your link to start earning commission.</p>';
-    return;
-  }
-
-  listEl.innerHTML = [...data.referrals]
-    .sort((a, b) => (b.joinedAt || 0) - (a.joinedAt || 0))
-    .map(ref => `
-      <div class="aff-ref-row">
-        <div>
-          <span class="aff-ref-name">${escapeHtml(ref.username)}</span>
-          <span class="aff-ref-meta">Joined ${formatDate(ref.joinedAt)}</span>
-        </div>
-        <span class="aff-ref-wagered">${formatMoney(ref.wagered || 0)}</span>
-      </div>`)
-    .join('');
+function normalizeStore(raw) {
+  const data = raw && typeof raw === 'object' ? raw : defaultStore();
+  return {
+    users: Array.isArray(data.users) ? data.users : [],
+    referralMap: data.referralMap && typeof data.referralMap === 'object' ? data.referralMap : {},
+    affiliates: data.affiliates && typeof data.affiliates === 'object' ? data.affiliates : {},
+  };
 }
 
-async function copyReferralLink() {
-  const input = document.getElementById('affLinkInput');
-  const btn = document.getElementById('affCopyBtn');
-  if (!input || !btn) return;
-
+async function loadStore(store) {
   try {
-    await navigator.clipboard.writeText(input.value);
-    btn.textContent = 'Copied!';
+    const raw = await store.get(STORE_KEY, { type: 'json', consistency: 'strong' });
+    return normalizeStore(raw);
   } catch {
-    input.select();
-    document.execCommand('copy');
-    btn.textContent = 'Copied!';
-  }
-  setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
-}
-
-async function claimCommission() {
-  const btn = document.getElementById('affClaimBtn');
-  if (btn) btn.disabled = true;
-  const claimed = await window.XythonAffiliates?.claim?.();
-  if (claimed > 0) renderAffiliates();
-  else if (btn) {
-    const data = window.XythonAffiliates?.get?.();
-    btn.disabled = (data?.pending || 0) < (window.XythonAffiliates?.minClaim || 0.01);
+    return defaultStore();
   }
 }
 
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+async function saveStore(store, data) {
+  await store.setJSON(STORE_KEY, data);
 }
+
+function resolveUser(users, name) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) return '';
+  const found = users.find(u => u.toLowerCase() === trimmed.toLowerCase());
+  return found || trimmed;
+}
+
+function userExists(store, username) {
+  const lower = String(username || '').trim().toLowerCase();
+  return store.users.some(u => u.toLowerCase() === lower);
+}
+
+function getAffiliateEntry(store, username) {
+  const name = String(username || '').trim();
+  if (!name) return null;
+  const resolved = resolveUser(store.users, name);
+  if (store.affiliates[resolved]) return { key: resolved, data: store.affiliates[resolved] };
+  const foundKey = Object.keys(store.affiliates).find(
+    k => k.toLowerCase() === resolved.toLowerCase()
+  );
+  return foundKey ? { key: foundKey, data: store.affiliates[foundKey] } : null;
+}
+
+function getAffiliatePayload(store, username) {
+  const name = String(username || '').trim();
+  const entry = getAffiliateEntry(store, name);
+  const data = entry?.data
+    ? {
+        pending: entry.data.pending || 0,
+        lifetime: entry.data.lifetime || 0,
+        referralWagered: entry.data.referralWagered || 0,
+        referrals: [...(entry.data.referrals || [])],
+      }
+    : defaultAffiliateData();
+
+  const affKey = (resolveUser(store.users, name) || name).toLowerCase();
+  Object.entries(store.referralMap).forEach(([userKey, referrer]) => {
+    const refKey = (resolveUser(store.users, referrer) || referrer).toLowerCase();
+    if (refKey !== affKey) return;
+    const referredName = resolveUser(store.users, userKey) || userKey;
+    if (data.referrals.some(r => r.username.toLowerCase() === referredName.toLowerCase())) return;
+    const storedRef = entry?.data?.referrals?.find(
+      r => r.username.toLowerCase() === referredName.toLowerCase()
+    );
+    data.referrals.push({
+      username: referredName,
+      joinedAt: storedRef?.joinedAt || Date.now(),
+      wagered: storedRef?.wagered || 0,
+    });
+  });
+
+  return {
+    referrer: store.referralMap[String(name).toLowerCase()] || null,
+    ...data,
+  };
+}
+
+function registerUser(store, username) {
+  const name = String(username || '').trim().slice(0, 16);
+  if (!name) return { error: 'Invalid username' };
+  if (!userExists(store, name)) store.users.push(name);
+  return { ok: true };
+}
+
+function linkReferral(store, newUser, referrerRaw) {
+  const newName = String(newUser || '').trim().slice(0, 16);
+  const code = String(referrerRaw || '').trim().slice(0, 16);
+  if (!newName || !code) return { error: 'Invalid referral' };
+  if (newName.toLowerCase() === code.toLowerCase()) return { error: 'Cannot refer yourself' };
+
+  const referrer = resolveUser(store.users, code);
+  if (!userExists(store, referrer)) return { error: 'Referrer not found' };
+
+  const userKey = newName.toLowerCase();
+  if (store.referralMap[userKey]) {
+    return { ok: true, referrer: store.referralMap[userKey], alreadyLinked: true };
+  }
+
+  store.referralMap[userKey] = referrer;
+  if (!userExists(store, newName)) store.users.push(newName);
+
+  const refEntry = getAffiliateEntry(store, referrer);
+  const refKey = refEntry?.key || referrer;
+  if (!store.affiliates[refKey]) store.affiliates[refKey] = defaultAffiliateData();
+
+  if (!store.affiliates[refKey].referrals.some(r => r.username.toLowerCase() === newName.toLowerCase())) {
+    store.affiliates[refKey].referrals.push({
+      username: newName,
+      joinedAt: Date.now(),
+      wagered: 0,
+    });
+  }
+
+  return { ok: true, referrer };
+}
+
+function accrueWager(store, username, amount) {
+  const wagered = Math.max(0, parseFloat(amount) || 0);
+  const name = String(username || '').trim();
+  if (!name || wagered <= 0) return { ok: true };
+
+  const userKey = name.toLowerCase();
+  const referrer = store.referralMap[userKey];
+  if (!referrer || referrer.toLowerCase() === userKey) return { ok: true };
+
+  const refEntry = getAffiliateEntry(store, referrer);
+  const refKey = refEntry?.key || referrer;
+  if (!store.affiliates[refKey]) store.affiliates[refKey] = defaultAffiliateData();
+
+  const commission = wagered * COMMISSION_RATE;
+  store.affiliates[refKey].pending = (store.affiliates[refKey].pending || 0) + commission;
+  store.affiliates[refKey].referralWagered = (store.affiliates[refKey].referralWagered || 0) + wagered;
+
+  const referral = store.affiliates[refKey].referrals.find(
+    r => r.username.toLowerCase() === name.toLowerCase()
+  );
+  if (referral) referral.wagered = (referral.wagered || 0) + wagered;
+
+  return { ok: true };
+}
+
+function claimCommission(store, username) {
+  const entry = getAffiliateEntry(store, username);
+  if (!entry?.data) return { claimed: 0 };
+
+  const pending = entry.data.pending || 0;
+  if (pending < MIN_CLAIM) return { claimed: 0 };
+
+  entry.data.pending = 0;
+  entry.data.lifetime = (entry.data.lifetime || 0) + pending;
+  return { claimed: pending };
+}
+
+async function writeStore(store, mutator) {
+  const maxAttempts = 5;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const data = await loadStore(store);
+    const result = mutator(data);
+    if (result?.error) return result;
+    await saveStore(store, data);
+    return result;
+  }
+  return { error: 'Store busy, try again' };
+}
+
+export default async (req) => {
+  const store = getStore({ name: 'nbd-affiliates', consistency: 'strong' });
+
+  if (req.method === 'GET') {
+    const url = new URL(req.url);
+    const user = url.searchParams.get('user') || '';
+    const exists = url.searchParams.get('exists') || '';
+    const data = await loadStore(store);
+
+    if (exists.trim()) {
+      return Response.json({ exists: userExists(data, exists.trim()) });
+    }
+
+    if (!user.trim()) {
+      return Response.json({ error: 'Missing user' }, { status: 400 });
+    }
+    return Response.json(getAffiliatePayload(data, user));
+  }
+
+  if (req.method === 'POST') {
+    let payload;
+    try {
+      payload = await req.json();
+    } catch {
+      return Response.json({ error: 'Bad request' }, { status: 400 });
+    }
+
+    const action = payload.action;
+
+    if (action === 'register') {
+      const result = await writeStore(store, data => registerUser(data, payload.username));
+      if (result.error) return Response.json(result, { status: 400 });
+      return Response.json({ ok: true });
+    }
+
+    if (action === 'link') {
+      const result = await writeStore(store, data =>
+        linkReferral(data, payload.newUser, payload.referrer)
+      );
+      if (result.error) return Response.json(result, { status: 400 });
+      return Response.json(result);
+    }
+
+    if (action === 'wager') {
+      await writeStore(store, data => {
+        accrueWager(data, payload.username, payload.amount);
+        return { ok: true };
+      });
+      return Response.json({ ok: true });
+    }
+
+    if (action === 'claim') {
+      const result = await writeStore(store, data => claimCommission(data, payload.username));
+      return Response.json(result);
+    }
+
+    return Response.json({ error: 'Unknown action' }, { status: 400 });
+  }
+
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204 });
+  }
+
+  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+};
+
+export const config = {
+  path: '/api/affiliates',
+};

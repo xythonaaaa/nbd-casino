@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "start": "node server/index.js",
-    "dev": "netlify dev"
+    "dev": "netlify dev",
+    "verify": "node scripts/verify-assets.mjs"
   },
   "dependencies": {
     "@netlify/blobs": "^8.1.0"

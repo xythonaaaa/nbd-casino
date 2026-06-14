@@ -1,6 +1,5 @@
 function renderGames() {
   renderGameGrid('originalsGrid', GAMES.originals.slice(0, 8));
-  renderGameGrid('slotsGrid', GAMES.slots);
 }
 
 function renderProviders() {

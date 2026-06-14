@@ -14,28 +14,6 @@ const GAMES = {
     { name: 'Tower', cover: 'tower', gradient: 'linear-gradient(180deg, #2dd4bf 0%, #0d9488 55%, #134e4a 100%)', href: 'tower.html' },
     { name: 'Wheel', cover: 'wheel', gradient: 'linear-gradient(180deg, #e879f9 0%, #c026d3 55%, #701a75 100%)', href: 'wheel.html' },
   ],
-  slots: [
-    { name: 'Sweet Bonanza', emoji: '🍬', gradient: 'linear-gradient(180deg, #f472b6 0%, #db2777 55%, #831843 100%)', badge: 'hot', demo: true },
-    { name: 'Gates of Olympus', emoji: '⚡', gradient: 'linear-gradient(180deg, #fde68a 0%, #f59e0b 55%, #78350f 100%)', badge: 'hot', demo: true },
-    { name: 'Sugar Rush', emoji: '🍭', gradient: 'linear-gradient(180deg, #f9a8d4 0%, #ec4899 55%, #9d174d 100%)', demo: true },
-    { name: 'Starlight Princess', emoji: '👸', gradient: 'linear-gradient(180deg, #e9d5ff 0%, #a855f7 55%, #6b21a8 100%)', demo: true },
-    { name: 'Big Bass Bonanza', emoji: '🐟', gradient: 'linear-gradient(180deg, #67e8f9 0%, #0891b2 55%, #164e63 100%)', demo: true },
-    { name: 'Big Bass Splash', emoji: '🎣', gradient: 'linear-gradient(180deg, #38bdf8 0%, #0284c7 55%, #0c4a6e 100%)', demo: true },
-    { name: 'Wanted Dead or a Wild', emoji: '🤠', gradient: 'linear-gradient(180deg, #d97706 0%, #92400e 55%, #451a03 100%)', demo: true },
-    { name: 'Fruit Party', emoji: '🍇', gradient: 'linear-gradient(180deg, #a3e635 0%, #65a30d 55%, #365314 100%)', demo: true },
-    { name: 'Wolf Gold', emoji: '🐺', gradient: 'linear-gradient(180deg, #fcd34d 0%, #ca8a04 55%, #713f12 100%)', demo: true },
-    { name: 'The Dog House', emoji: '🐕', gradient: 'linear-gradient(180deg, #fbbf24 0%, #d97706 55%, #78350f 100%)', demo: true },
-    { name: 'Wild West Gold', emoji: '⭐', gradient: 'linear-gradient(180deg, #fde047 0%, #ca8a04 55%, #713f12 100%)', demo: true },
-    { name: 'Floating Dragon', emoji: '🐉', gradient: 'linear-gradient(180deg, #34d399 0%, #059669 55%, #064e3b 100%)', demo: true },
-    { name: 'Buffalo King Megaways', emoji: '🦬', gradient: 'linear-gradient(180deg, #fdba74 0%, #ea580c 55%, #7c2d12 100%)', demo: true },
-    { name: 'Mustang Gold', emoji: '🐎', gradient: 'linear-gradient(180deg, #f87171 0%, #dc2626 55%, #7f1d1d 100%)', demo: true },
-    { name: 'Madame Destiny Megaways', emoji: '🔮', gradient: 'linear-gradient(180deg, #c4b5fd 0%, #7c3aed 55%, #4c1d95 100%)', demo: true },
-    { name: 'Power of Thor Megaways', emoji: '🔨', gradient: 'linear-gradient(180deg, #93c5fd 0%, #2563eb 55%, #1e3a8a 100%)', demo: true },
-    { name: 'Zeus vs Hades', emoji: '⚔️', gradient: 'linear-gradient(180deg, #67e8f9 0%, #0891b2 55%, #164e63 100%)', demo: true },
-    { name: 'Candy Blitz', emoji: '🍬', gradient: 'linear-gradient(180deg, #f9a8d4 0%, #ec4899 55%, #9d174d 100%)', badge: 'new', demo: true },
-    { name: 'Release the Kraken 2', emoji: '🐙', gradient: 'linear-gradient(180deg, #818cf8 0%, #4f46e5 55%, #312e81 100%)', demo: true },
-    { name: 'Fire Stampede', emoji: '🔥', gradient: 'linear-gradient(180deg, #fb923c 0%, #ea580c 55%, #431407 100%)', demo: true },
-  ],
 };
 
 const PROVIDERS = [
@@ -393,22 +371,6 @@ function warCoverHTML(game) {
   `;
 }
 
-function showDemoComingSoon(gameName) {
-  let toast = document.getElementById('demoComingSoonToast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'demoComingSoonToast';
-    toast.className = 'demo-coming-soon-toast';
-    toast.setAttribute('role', 'status');
-    toast.setAttribute('aria-live', 'polite');
-    document.body.appendChild(toast);
-  }
-  toast.textContent = `${gameName} — Demo coming soon. Real play requires Pragmatic Play integration.`;
-  toast.classList.add('visible');
-  clearTimeout(showDemoComingSoon._timer);
-  showDemoComingSoon._timer = setTimeout(() => toast.classList.remove('visible'), 3200);
-}
-
 function createGameCard(game) {
   const card = document.createElement('div');
   card.className = 'game-card' + (game.cover ? ` game-card--cover-${game.cover}` : '');
@@ -458,7 +420,6 @@ function createGameCard(game) {
     }
     card.classList.add('game-card--pressed');
     setTimeout(() => card.classList.remove('game-card--pressed'), 150);
-    if (game.demo) showDemoComingSoon(game.name);
   });
   return card;
 }

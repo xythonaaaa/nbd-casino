@@ -71,11 +71,29 @@ In the Cloudflare dashboard:
    | Setting | Value |
    |---------|-------|
    | Production branch | `main` |
-   | Build command | `npm install && npm run verify` |
-   | Build output directory | `.` |
-   | **Deploy command** | **Leave empty** (do not set `npx wrangler deploy`) |
+   | Build command | `npm install && npm run build:pages` |
+   | Build output directory | `.` (a single dot — repo root, **not** `public/` or `dist/`) |
+   | **Deploy command** | **Leave empty / delete any value** |
 
-   **Important:** Cloudflare **Pages** auto-deploys static files from the build output directory plus the `functions/` folder. A **Deploy command** is only for standalone **Workers** projects. If you set `npx wrangler deploy`, the build succeeds but deployment fails at the "Deploying" stage.
+   **If verify ever fails on CI** (wrong/truncated CSS or JS uploaded), you can temporarily use build command `npm install` only — static files are already in the repo and do not need compilation.
+
+   ### Pages vs Workers — read this if the build keeps failing
+
+   | What you see in the dashboard | Project type | What to do |
+   |-------------------------------|--------------|------------|
+   | Settings → **Builds** with **Build command**, **Build output directory**, **no Deploy command field** | **Cloudflare Pages** (correct) | Deploy command must stay empty |
+   | Settings → **Builds** with **Build command** **and** a **Deploy command** field (e.g. `npx wrangler deploy`) | **Workers Builds** (wrong for this repo) | See [Fix: wrong project type](#fix-wrong-project-type-workers-builds) below |
+
+   Cloudflare **Pages** auto-deploys static files from the build output directory plus the `functions/` folder after the build command finishes. You never run `wrangler deploy` or `wrangler pages deploy` in the dashboard for Git-connected Pages.
+
+   **Typical failure when Deploy command is set:** build succeeds, then the **Deploying** step fails with:
+
+   ```text
+   It looks like you've run a Workers-specific command in a Pages project.
+   For Pages, please run `wrangler pages deploy` instead.
+   ```
+
+   Even if you changed that to `wrangler pages deploy`, you still should **not** use a Deploy command — remove it entirely.
 
 4. Deploy once (KV bindings come next — first deploy may show API errors until bindings are set).
 
@@ -188,13 +206,56 @@ curl "https://nbdcasino.com/api/wallet?user=testuser"
 
 ## Troubleshooting
 
+### Read the failed build log first
+
+1. **Workers & Pages → nbd-casino → Deployments**.
+2. Click the **failed** deployment (red status).
+3. Open **Build log** and scroll to the **last 20–30 lines** — the real error is almost always there.
+
+| Log symptom | Likely cause | Fix |
+|-------------|--------------|-----|
+| `Workers-specific command in a Pages project` / `wrangler pages deploy` | Deploy command is `npx wrangler deploy` | Clear Deploy command (Pages) or recreate as Pages — see below |
+| `Deploy verification FAILED` / `css/styles.css looks too small` | `npm run verify` failed | Ensure full `css/styles.css`, `css/casino-home.css`, `js/common.js` are committed; or use build command `npm install` only |
+| Build OK, site 404 on `/` | Wrong output directory | Set **Build output directory** to `.` (repo root) |
+| Build never starts / wrong repo | Wrong branch or disconnected Git | Production branch = `main`, repo = `xythonaaaa/nbd-casino` |
+
+### Fix: wrong project type (Workers Builds)
+
+If your project settings show a **Deploy command** field, you likely created a **Worker** (Workers Builds), not **Pages**. This repo is configured for **Pages + Pages Functions** (`functions/`, `_routes.json`, `pages_build_output_dir = "."` in `wrangler.toml`). Workers Builds expect `wrangler deploy` and a Worker entry point — that will not work here.
+
+**Recommended fix — recreate as Pages:**
+
+1. **Workers & Pages → nbd-casino → Settings → General → Delete project** (or rename the broken Worker project).
+2. **Workers & Pages → Create → Pages → Connect to Git**.
+3. Repository: `xythonaaaa/nbd-casino`, branch: `main`.
+4. Build command: `npm install && npm run build:pages`
+5. Build output directory: `.`
+6. **Do not set a Deploy command** (Pages has no deploy step).
+7. After first deploy: add KV bindings (Step 4 above) and custom domain (Step 5).
+
+**If you already have a Pages project** but someone added a Deploy command:
+
+1. **Settings → Builds → Deploy command** — delete `npx wrangler deploy` (leave blank).
+2. **Save** → **Deployments → Retry deployment**.
+
+### Redirects and headers (no `public/` folder)
+
+This site publishes from the **repo root** (`.`), not a `public/` subdirectory. These files are already in the correct place:
+
+- `_redirects` — HTTP → HTTPS for `nbdcasino.com`
+- `_headers` — security headers
+- `_routes.json` — Pages Functions only on `/api/*`
+
+Do **not** move them into `public/` unless you change the build output directory to `public/`.
+
+### Other issues
+
 | Issue | Fix |
 |-------|-----|
-| Build succeeds, deploy fails at "Deploying" | Remove Deploy command in Settings → Builds (must be empty for Pages) |
 | API returns 500 / empty | Check KV bindings in Pages → Settings → Functions |
 | `Store busy, try again` | Normal under heavy concurrent writes; client should retry |
-| Static files 404 | Build output directory must be `.` (repo root) |
 | Functions not invoked | Confirm `_routes.json` includes `/api/*` |
+| Node version errors | Add environment variable `NODE_VERSION` = `20` under Settings → Environment variables |
 
 ---
 

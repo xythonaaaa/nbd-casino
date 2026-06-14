@@ -6,7 +6,8 @@
     "dev": "node server/index.js",
     "dev:cf": "wrangler pages dev .",
     "dev:netlify": "netlify dev",
-    "verify": "node scripts/verify-assets.mjs"
+    "verify": "node scripts/verify-assets.mjs",
+    "build:pages": "node scripts/verify-assets.mjs"
   },
   "devDependencies": {
     "wrangler": "^3.114.0"

@@ -116,43 +116,44 @@ document.addEventListener('DOMContentLoaded', () => {
   initCasinoJackpots();
   document.addEventListener('xython:leaderboard-change', () => {
     renderLiveWins();
-    updateJackpotPaid();
   });
 });
 
+function getStatsApiUrl() {
+  if (window.NBD_STATS_API) return window.NBD_STATS_API;
+  if (location.protocol === 'http:' || location.protocol === 'https:') {
+    return `${location.origin}/api/stats`;
+  }
+  return null;
+}
+
+async function updateJackpotOnline() {
+  const el = document.getElementById('jackpotOnline');
+  if (!el) return;
+  const url = getStatsApiUrl();
+  if (!url) return;
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && typeof data.playersOnline === 'number') {
+      el.textContent = data.playersOnline.toLocaleString('en-US');
+    }
+  } catch {
+    // keep current display
+  }
+}
+
 function initCasinoJackpots() {
   const daily = document.getElementById('jackpotDaily');
+  const paid = document.getElementById('jackpotPaid');
   const online = document.getElementById('jackpotOnline');
   if (!daily) return;
 
-  let dailyVal = 124892.5;
-  setInterval(() => {
-    dailyVal += Math.random() * 12 + 2;
-    daily.textContent = `$${dailyVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  }, 3000);
+  daily.textContent = 's00n';
+  if (paid) paid.textContent = '67m+';
 
   if (online) {
-    let count = 1180 + Math.floor(Math.random() * 120);
-    setInterval(() => {
-      count += Math.floor(Math.random() * 7) - 3;
-      count = Math.max(980, Math.min(2400, count));
-      online.textContent = count.toLocaleString('en-US');
-    }, 5000);
-  }
-
-  updateJackpotPaid();
-}
-
-function updateJackpotPaid() {
-  const el = document.getElementById('jackpotPaid');
-  if (!el || !window.NbdLeaderboard) return;
-  const wins = window.NbdLeaderboard.getRecentWins?.(500) || [];
-  const total = wins.reduce((sum, w) => sum + w.payout, 0);
-  if (total >= 1000000) {
-    el.textContent = `$${(total / 1000000).toFixed(1)}M+`;
-  } else if (total >= 1000) {
-    el.textContent = `$${Math.round(total / 1000)}K+`;
-  } else if (total > 0) {
-    el.textContent = `$${total.toLocaleString('en-US', { maximumFractionDigits: 0 })}+`;
+    updateJackpotOnline();
+    setInterval(updateJackpotOnline, 60000);
   }
 }

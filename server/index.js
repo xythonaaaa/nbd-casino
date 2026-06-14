@@ -898,6 +898,12 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.url === '/api/stats' && req.method === 'GET') {
+    const wallet = loadWalletStore();
+    sendJson(res, 200, { playersOnline: wallet.users.length });
+    return;
+  }
+
   if (req.url.startsWith('/api/affiliates')) {
     handleAffiliatesRequest(req, res, req.url);
     return;

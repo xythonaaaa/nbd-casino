@@ -35,10 +35,10 @@ const RISKS = {
     label: 'Hard',
     slices: [
       { mult: 0, color: '#374151', label: '0x' },
-      { mult: 5, color: '#e879f9', label: '5x' },
+      { mult: 0, color: '#374151', label: '0x' },
       { mult: 10, color: '#fde047', label: '10x', text: '#1e1b4b' },
       { mult: 0, color: '#374151', label: '0x' },
-      { mult: 5, color: '#d946ef', label: '5x' },
+      { mult: 0, color: '#374151', label: '0x' },
       { mult: 50, color: '#fbbf24', label: '50x', text: '#1e1b4b' },
       { mult: 0, color: '#374151', label: '0x' },
       { mult: 5, color: '#c026d3', label: '5x' },

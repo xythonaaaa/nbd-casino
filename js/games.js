@@ -14,14 +14,6 @@ const GAMES = {
     { name: 'Tower', cover: 'tower', gradient: 'linear-gradient(180deg, #2dd4bf 0%, #0d9488 55%, #134e4a 100%)', href: 'tower.html' },
     { name: 'Wheel', cover: 'wheel', gradient: 'linear-gradient(180deg, #e879f9 0%, #c026d3 55%, #701a75 100%)', href: 'wheel.html' },
   ],
-  live: [
-    { name: 'Crazy Time', emoji: '🎡', gradient: 'linear-gradient(180deg, #fb7185 0%, #e11d48 55%, #881337 100%)', badge: 'live' },
-    { name: 'Lightning Roulette', emoji: '⚡', gradient: 'linear-gradient(180deg, #fef08a 0%, #eab308 55%, #713f12 100%)', badge: 'live' },
-    { name: 'Blackjack VIP', emoji: '🃏', gradient: 'linear-gradient(180deg, #9b6dff 0%, #5b21b6 55%, #3b0764 100%)', badge: 'live' },
-    { name: 'Mega Ball', emoji: '🔮', gradient: 'linear-gradient(180deg, #818cf8 0%, #4f46e5 55%, #312e81 100%)', badge: 'live' },
-    { name: 'Monopoly Live', emoji: '🎩', gradient: 'linear-gradient(180deg, #6ee7b7 0%, #059669 55%, #064e3b 100%)', badge: 'live' },
-    { name: 'Dream Catcher', emoji: '🌙', gradient: 'linear-gradient(180deg, #c4b5fd 0%, #7c3aed 55%, #4c1d95 100%)', badge: 'live' },
-  ],
 };
 
 const PROVIDERS = [

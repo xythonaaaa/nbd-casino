@@ -2,17 +2,6 @@ function renderGames() {
   renderGameGrid('originalsGrid', GAMES.originals.slice(0, 8));
 }
 
-function renderProviders() {
-  const grid = document.getElementById('providersGrid');
-  if (!grid) return;
-  PROVIDERS.forEach(name => {
-    const card = document.createElement('div');
-    card.className = 'provider-card';
-    card.textContent = name;
-    grid.appendChild(card);
-  });
-}
-
 const PROMO_ACTIONS = {
   originals: () => { window.location.href = 'originals.html'; },
   war: () => { window.location.href = 'war.html'; },
@@ -107,8 +96,7 @@ function initCarousel() {
 
 function initFilters() {
   const tabs = document.querySelectorAll('.filter-tab[data-filter]');
-  const sections = document.querySelectorAll('.game-section:not(.providers-section)');
-  const providers = document.querySelector('.providers-section');
+  const sections = document.querySelectorAll('.game-section');
   const search = document.getElementById('gameSearch');
 
   tabs.forEach(tab => {
@@ -125,8 +113,6 @@ function initFilters() {
         }
       });
 
-      providers?.classList.toggle('hidden', filter !== 'all');
-
       if (search) search.value = '';
       document.querySelectorAll('.game-card').forEach(card => { card.style.display = ''; });
     });
@@ -141,7 +127,6 @@ function initFilters() {
       });
       if (query) {
         sections.forEach(s => s.classList.remove('hidden'));
-        providers?.classList.remove('hidden');
       }
     });
   }
@@ -150,7 +135,6 @@ function initFilters() {
 document.addEventListener('DOMContentLoaded', () => {
   initCommon();
   renderGames();
-  renderProviders();
   renderLiveWins();
   initCarousel();
   initFilters();

@@ -16,13 +16,6 @@ const GAMES = {
   ],
 };
 
-const PROVIDERS = [
-  'Pragmatic Play', 'Hacksaw Gaming', 'Nolimit City', 'NetEnt',
-  'Play\'n Go', 'Push Gaming', 'Red Tiger', 'Relax Gaming',
-  'Big Time Gaming', 'Thunderkick', 'Spribe', 'Evolution',
-  'AvatarUX', 'Endorphina', 'PGSoft', 'Spinomenal',
-];
-
 const PLAYERS = [
   'CryptoKing', 'LuckyAce', 'MoonWalker', 'BitSpinner', 'NeonWolf',
   'ShadowBet', 'GoldRush', 'StarPlayer', 'DarkHorse', 'RainMaker',

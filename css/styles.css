@@ -4334,32 +4334,6 @@ input {
   color: rgba(255, 255, 255, 0.85);
 }
 
-/* Providers */
-.providers-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 10px;
-}
-
-.provider-card {
-  padding: 16px 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  text-align: center;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  transition: all var(--transition);
-  cursor: pointer;
-}
-
-.provider-card:hover {
-  border-color: var(--border-hover);
-  color: var(--text-primary);
-  background: var(--bg-card-hover);
-}
-
 /* SEO footer */
 .seo-footer {
   margin-top: 48px;

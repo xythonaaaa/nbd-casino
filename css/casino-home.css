@@ -433,19 +433,6 @@ body[data-page="originals"] .game-card-badge.live {
   50% { box-shadow: 0 0 16px rgba(239, 68, 68, 0.7); }
 }
 
-/* Providers */
-body[data-page="casino"] .provider-card,
-body[data-page="originals"] .provider-card {
-  background: rgba(8, 4, 16, 0.8);
-  border-color: rgba(147, 51, 234, 0.15);
-}
-
-body[data-page="casino"] .provider-card:hover,
-body[data-page="originals"] .provider-card:hover {
-  border-color: rgba(253, 224, 71, 0.25);
-  color: #fde047;
-}
-
 /* Right panel */
 body[data-page="casino"] .right-panel,
 body[data-page="originals"] .right-panel {

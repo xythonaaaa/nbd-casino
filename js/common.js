@@ -2133,7 +2133,49 @@ function userMenuIcon(type) {
 let userMenuOutsideClickBound = false;
 
 const DAILY_REWARD_KEY = 'xython-daily-reward';
-const DAILY_REWARD_AMOUNT = 5;
+const DAILY_REWARD_AMOUNT = 500;
+const DAILY_REWARD_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const SIGNUP_BONUS_AMOUNT = 500;
+
+function signupBonusKey(username) {
+  const name = (username || getLoggedInUsername() || '').trim().toLowerCase();
+  return name ? `xython-signup-bonus-${name}` : 'xython-signup-bonus';
+}
+
+function dailyRewardKey(username) {
+  const name = (username || getLoggedInUsername() || '').trim().toLowerCase();
+  return name ? `xython-daily-reward-${name}` : DAILY_REWARD_KEY;
+}
+
+function hasClaimedSignupBonus(username) {
+  const name = (username || '').trim();
+  if (!name) return false;
+  if (localStorage.getItem(signupBonusKey(name)) === '1') return true;
+  return !!getAccount(name)?.signupBonusClaimed;
+}
+
+function markSignupBonusClaimed(username) {
+  localStorage.setItem(signupBonusKey(username), '1');
+  const accounts = loadAccounts();
+  const key = username.toLowerCase();
+  if (accounts[key]) {
+    accounts[key].signupBonusClaimed = true;
+    saveAccounts(accounts);
+  }
+}
+
+function grantSignupBonus(username) {
+  if (!username || hasClaimedSignupBonus(username)) return false;
+  const currency = 'USD';
+  const balance = window.XythonWallet?.getBalance(currency) ?? 0;
+  window.XythonWallet?.setBalance(currency, balance + SIGNUP_BONUS_AMOUNT, {
+    type: 'reward',
+    label: 'Signup Bonus',
+    detail: `+$${SIGNUP_BONUS_AMOUNT.toFixed(2)} welcome bonus`,
+  });
+  markSignupBonusClaimed(username);
+  return true;
+}
 const RAKEBACK_KEY = 'xython-rakeback';
 const RAKEBACK_MIN_CLAIM = 0.01;
 const RANK_REWARDS_KEY = 'xython-rank-rewards';
@@ -2262,14 +2304,46 @@ function updateRewardsDot() {
   }
 }
 
-function isDailyRewardAvailable() {
+function getDailyRewardLastClaim(username) {
+  const user = username || getLoggedInUsername();
+  if (!user) return null;
   try {
-    const last = localStorage.getItem(DAILY_REWARD_KEY);
-    if (!last) return true;
-    return new Date(last).toDateString() !== new Date().toDateString();
+    const perUser = localStorage.getItem(dailyRewardKey(user));
+    if (perUser) return perUser;
+    const legacy = localStorage.getItem(DAILY_REWARD_KEY);
+    return legacy || null;
   } catch {
-    return true;
+    return null;
   }
+}
+
+function getDailyRewardCooldownRemaining(username) {
+  const last = getDailyRewardLastClaim(username);
+  if (!last) return 0;
+  const lastTs = new Date(last).getTime();
+  if (Number.isNaN(lastTs)) return 0;
+  return Math.max(0, DAILY_REWARD_COOLDOWN_MS - (Date.now() - lastTs));
+}
+
+function formatDailyRewardCooldown(username) {
+  const remaining = getDailyRewardCooldownRemaining(username);
+  if (remaining <= 0) return '';
+  const hours = Math.floor(remaining / 3600000);
+  const mins = Math.ceil((remaining % 3600000) / 60000);
+  if (hours > 0) return `Next in ${hours}h ${mins}m`;
+  return `Next in ${mins}m`;
+}
+
+function isDailyRewardAvailable(username) {
+  const user = username || getLoggedInUsername();
+  if (!user) return false;
+  return getDailyRewardCooldownRemaining(user) <= 0;
+}
+
+function markDailyRewardClaimed(username) {
+  const user = username || getLoggedInUsername();
+  if (!user) return;
+  localStorage.setItem(dailyRewardKey(user), new Date().toISOString());
 }
 
 function buildRewardsHeaderHtml() {
@@ -2290,6 +2364,7 @@ function buildRewardsHeaderHtml() {
 function buildRewardsPopoutContent() {
   const rank = getPlayerRank(loadProfileStats().wagered);
   const dailyAvailable = isDailyRewardAvailable();
+  const dailyCooldown = dailyAvailable ? '' : formatDailyRewardCooldown();
   const wagered = loadProfileStats().wagered;
   const rakebackRate = (getRakebackRate() * 100).toFixed(1);
   const rakebackPending = getRakebackPending();
@@ -2311,10 +2386,10 @@ function buildRewardsPopoutContent() {
         <div class="rewards-card-icon">${userMenuIcon('rewards')}</div>
         <div class="rewards-card-body">
           <span class="rewards-card-title">Daily Bonus</span>
-          <span class="rewards-card-desc">Free $${DAILY_REWARD_AMOUNT.toFixed(2)} every 24 hours</span>
+          <span class="rewards-card-desc">Free $${DAILY_REWARD_AMOUNT.toFixed(2)} every 24 hours${dailyCooldown ? ` · ${dailyCooldown}` : ''}</span>
         </div>
         <button type="button" class="rewards-claim-btn${dailyAvailable ? '' : ' is-claimed'}" id="rewardsDailyClaim" ${dailyAvailable ? '' : 'disabled'}>
-          ${dailyAvailable ? 'Claim' : 'Claimed'}
+          ${dailyAvailable ? 'Claim' : (dailyCooldown || 'Claimed')}
         </button>
       </div>
       <div class="rewards-card rewards-card--rakeback">
@@ -2407,7 +2482,7 @@ function wireRewardsPopoutActions() {
       label: 'Daily Bonus',
       detail: `+$${DAILY_REWARD_AMOUNT.toFixed(2)} daily reward`,
     });
-    localStorage.setItem(DAILY_REWARD_KEY, new Date().toISOString());
+    markDailyRewardClaimed();
     refreshRewardsPopout();
     updateRewardsDot();
   });
@@ -2751,8 +2826,10 @@ function initAuthModal() {
       submitBtn.disabled = false;
 
       saveUser(username);
+      const gotSignupBonus = grantSignupBonus(username);
       notifyAuthChange();
       let welcomeMsg = `Welcome, ${username}!`;
+      if (gotSignupBonus) welcomeMsg += ` $${SIGNUP_BONUS_AMOUNT.toFixed(0)} signup bonus added.`;
       if (linkedReferrer) welcomeMsg += ` Referred by ${linkedReferrer}.`;
       successEl.textContent = welcomeMsg;
       successEl.hidden = false;
@@ -2878,6 +2955,11 @@ function resetAccountProgress() {
   }));
   localStorage.setItem(PROFILE_STATS_KEY, JSON.stringify({ ...DEFAULT_PROFILE_STATS }));
   localStorage.removeItem(RAKEBACK_KEY);
+  const user = getLoggedInUsername();
+  if (user) {
+    localStorage.removeItem(dailyRewardKey(user));
+    localStorage.removeItem(signupBonusKey(user));
+  }
   localStorage.removeItem(DAILY_REWARD_KEY);
   localStorage.removeItem(RANK_REWARDS_KEY);
   localStorage.removeItem(TRANSACTIONS_KEY);

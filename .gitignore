@@ -1,0 +1,7 @@
+node_modules/
+.netlify/
+.wrangler/
+server/chat-data.json
+server/leaderboard-data.json
+server/wallet-data.json
+server/affiliates-data.json

@@ -1,0 +1,30 @@
+# NBD Casino — Cloudflare Pages + Workers KV
+# Primary deployment target (Netlify config kept in netlify.toml for reference)
+
+name = "nbd-casino"
+compatibility_date = "2024-06-01"
+pages_build_output_dir = "."
+
+# Replace placeholder IDs after creating KV namespaces in the Cloudflare dashboard.
+# Production IDs go in `id`; preview/branch deploys use `preview_id`.
+# Bindings must also be added under Pages → Settings → Functions → KV namespace bindings.
+
+[[kv_namespaces]]
+binding = "CHAT_KV"
+id = "00000000000000000000000000000000"
+preview_id = "00000000000000000000000000000001"
+
+[[kv_namespaces]]
+binding = "LEADERBOARD_KV"
+id = "00000000000000000000000000000002"
+preview_id = "00000000000000000000000000000003"
+
+[[kv_namespaces]]
+binding = "WALLET_KV"
+id = "00000000000000000000000000000004"
+preview_id = "00000000000000000000000000000005"
+
+[[kv_namespaces]]
+binding = "AFFILIATES_KV"
+id = "00000000000000000000000000000006"
+preview_id = "00000000000000000000000000000007"

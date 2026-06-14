@@ -1,3 +1,7 @@
+# LEGACY — Cloudflare Pages is the primary deployment target.
+# See cloudflare/MIGRATION.md and wrangler.toml for production setup.
+# This file is kept for reference if you still run Netlify locally.
+
 [build]
   command = "npm install && if [ -f scripts/verify-assets.mjs ]; then npm run verify; else echo 'verify-assets.mjs missing — skipping file checks'; fi"
   publish = "."

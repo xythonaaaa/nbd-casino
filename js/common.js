@@ -606,14 +606,21 @@ function ensureChatEmotePicker() {
   });
   searchInput?.addEventListener('click', e => e.stopPropagation());
 
-  picker.querySelector('.chat-emote-picker-close')?.addEventListener('click', closeChatEmotePicker);
+  picker.querySelector('.chat-emote-picker-close')?.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeChatEmotePicker();
+  });
   document.addEventListener('click', e => {
-    if (!picker.hidden && !e.target.closest('.chat-emote-picker, .chat-emote-btn')) {
+    if (!chatEmotePickerEl || chatEmotePickerEl.hidden) return;
+    if (!e.target.closest('.chat-emote-picker, .chat-emote-btn')) {
       closeChatEmotePicker();
     }
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeChatEmotePicker();
+    if (e.key === 'Escape' && chatEmotePickerEl && !chatEmotePickerEl.hidden) {
+      closeChatEmotePicker();
+    }
   });
 
   chatEmotePickerEl = picker;

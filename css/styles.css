@@ -4590,6 +4590,10 @@ input {
   overflow: hidden;
 }
 
+.chat-emote-picker[hidden] {
+  display: none !important;
+}
+
 .chat-emote-picker-header {
   display: flex;
   align-items: center;
@@ -4631,6 +4635,8 @@ input {
   color: var(--text-muted);
   font-size: 1.1rem;
   line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .chat-emote-picker-close:hover {

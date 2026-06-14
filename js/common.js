@@ -2,9 +2,11 @@ const CHAT_STORAGE_KEY = 'nbd-chat-v1';
 const CHAT_MAX_MESSAGES = 200;
 const CHAT_MAX_LENGTH = 240;
 const CHAT_POLL_MS = 3000;
-const SEVEN_TV_EMOTES_CACHE_KEY = 'nbd-7tv-emotes-v1';
+const SEVEN_TV_EMOTES_CACHE_KEY = 'nbd-7tv-emotes-v2';
 const SEVEN_TV_EMOTES_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const SEVEN_TV_GLOBAL_SET_URL = 'https://7tv.io/v3/emote-sets/global';
+const SEVEN_TV_USER_ID = '01K6MVTSE5YJYFY6KBMHYJ5QM5';
+const SEVEN_TV_USER_URL = `https://7tv.io/v3/users/${SEVEN_TV_USER_ID}`;
 
 const PANEL_STORAGE_KEY = 'xython-panel-open';
 const WALLET_STORAGE_KEY = 'xython-wallet';
@@ -454,6 +456,7 @@ let sevenTvEmoteMap = new Map();
 let sevenTvEmotePattern = null;
 let chatEmotePickerEl = null;
 let chatEmotePickerInput = null;
+let chatEmotePickerFilter = '';
 
 function buildSevenTvEmoteUrl(emoteId) {
   return `https://cdn.7tv.app/emote/${emoteId}/2x.webp`;
@@ -497,6 +500,44 @@ function applySevenTvEmotes(emotes) {
   rebuildSevenTvEmotePattern();
 }
 
+function parseSevenTvEmoteEntry(entry) {
+  const name = entry?.name || entry?.data?.name;
+  const id = entry?.id || entry?.data?.id;
+  if (!name || !id) return null;
+  return { name, id, url: buildSevenTvEmoteUrl(id) };
+}
+
+async function fetchSevenTvEmoteSet(setId) {
+  const res = await fetch(`https://7tv.io/v3/emote-sets/${setId}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (Array.isArray(data.emotes) ? data.emotes : [])
+    .map(parseSevenTvEmoteEntry)
+    .filter(Boolean);
+}
+
+async function fetchSevenTvUserEmotes() {
+  const res = await fetch(SEVEN_TV_USER_URL);
+  if (!res.ok) return [];
+  const data = await res.json();
+  const sets = Array.isArray(data.emote_sets) ? data.emote_sets : [];
+  const batches = await Promise.all(
+    sets.map(set => (set?.id ? fetchSevenTvEmoteSet(set.id) : Promise.resolve([])))
+  );
+  return batches.flat();
+}
+
+function mergeSevenTvEmotes(globalEmotes, userEmotes) {
+  const merged = new Map();
+  for (const emote of globalEmotes) {
+    if (emote?.name && emote?.url) merged.set(emote.name, emote);
+  }
+  for (const emote of userEmotes) {
+    if (emote?.name && emote?.url) merged.set(emote.name, emote);
+  }
+  return [...merged.values()];
+}
+
 async function loadSevenTvEmotes() {
   try {
     const raw = localStorage.getItem(SEVEN_TV_EMOTES_CACHE_KEY);
@@ -515,17 +556,20 @@ async function loadSevenTvEmotes() {
   } catch { /* ignore */ }
 
   try {
-    const res = await fetch(SEVEN_TV_GLOBAL_SET_URL);
-    if (!res.ok) return sevenTvEmoteMap.size;
-    const data = await res.json();
-    const emotes = (Array.isArray(data.emotes) ? data.emotes : [])
-      .map(entry => {
-        const name = entry.name || entry.data?.name;
-        const id = entry.id || entry.data?.id;
-        if (!name || !id) return null;
-        return { name, id, url: buildSevenTvEmoteUrl(id) };
-      })
-      .filter(Boolean);
+    const [globalRes, userEmotes] = await Promise.all([
+      fetch(SEVEN_TV_GLOBAL_SET_URL),
+      fetchSevenTvUserEmotes(),
+    ]);
+
+    let globalEmotes = [];
+    if (globalRes.ok) {
+      const data = await globalRes.json();
+      globalEmotes = (Array.isArray(data.emotes) ? data.emotes : [])
+        .map(parseSevenTvEmoteEntry)
+        .filter(Boolean);
+    }
+
+    const emotes = mergeSevenTvEmotes(globalEmotes, userEmotes);
     applySevenTvEmotes(emotes);
     if (emotes.length) {
       localStorage.setItem(SEVEN_TV_EMOTES_CACHE_KEY, JSON.stringify({
@@ -548,9 +592,19 @@ function ensureChatEmotePicker() {
       <span>7TV Emotes</span>
       <button type="button" class="chat-emote-picker-close" aria-label="Close emote picker">&times;</button>
     </div>
+    <div class="chat-emote-picker-search-wrap">
+      <input type="search" class="chat-emote-picker-search" placeholder="Search emotes..." autocomplete="off" spellcheck="false" aria-label="Search emotes">
+    </div>
     <div class="chat-emote-picker-grid"></div>
   `;
   document.body.appendChild(picker);
+
+  const searchInput = picker.querySelector('.chat-emote-picker-search');
+  searchInput?.addEventListener('input', () => {
+    chatEmotePickerFilter = searchInput.value.trim().toLowerCase();
+    renderChatEmotePickerGrid();
+  });
+  searchInput?.addEventListener('click', e => e.stopPropagation());
 
   picker.querySelector('.chat-emote-picker-close')?.addEventListener('click', closeChatEmotePicker);
   document.addEventListener('click', e => {
@@ -571,9 +625,11 @@ function renderChatEmotePickerGrid() {
   const grid = picker.querySelector('.chat-emote-picker-grid');
   if (!grid) return;
 
-  const emotes = [...sevenTvEmoteMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const emotes = [...sevenTvEmoteMap.values()]
+    .filter(emote => !chatEmotePickerFilter || emote.name.toLowerCase().includes(chatEmotePickerFilter))
+    .sort((a, b) => a.name.localeCompare(b.name));
   if (!emotes.length) {
-    grid.innerHTML = '<p class="chat-emote-picker-empty">Emotes unavailable</p>';
+    grid.innerHTML = `<p class="chat-emote-picker-empty">${chatEmotePickerFilter ? 'No emotes match your search' : 'Emotes unavailable'}</p>`;
     return;
   }
 
@@ -609,6 +665,9 @@ function openChatEmotePicker(anchorBtn, input) {
   if (!isLoggedIn() || !sevenTvEmoteMap.size) return;
   const picker = ensureChatEmotePicker();
   chatEmotePickerInput = input;
+  chatEmotePickerFilter = '';
+  const searchInput = picker.querySelector('.chat-emote-picker-search');
+  if (searchInput) searchInput.value = '';
   renderChatEmotePickerGrid();
   picker.hidden = false;
 
@@ -630,6 +689,7 @@ function closeChatEmotePicker() {
   if (!chatEmotePickerEl) return;
   chatEmotePickerEl.hidden = true;
   chatEmotePickerInput = null;
+  chatEmotePickerFilter = '';
 }
 
 function injectChatEmoteButtons() {

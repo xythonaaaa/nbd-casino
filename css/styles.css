@@ -4601,6 +4601,29 @@ input {
   color: var(--text-secondary);
 }
 
+.chat-emote-picker-search-wrap {
+  padding: 8px 12px 0;
+}
+
+.chat-emote-picker-search {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
+
+.chat-emote-picker-search:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.chat-emote-picker-search::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+
 .chat-emote-picker-close {
   width: 24px;
   height: 24px;

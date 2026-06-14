@@ -14,23 +14,6 @@ const GAMES = {
     { name: 'Tower', cover: 'tower', gradient: 'linear-gradient(180deg, #2dd4bf 0%, #0d9488 55%, #134e4a 100%)', href: 'tower.html' },
     { name: 'Wheel', cover: 'wheel', gradient: 'linear-gradient(180deg, #e879f9 0%, #c026d3 55%, #701a75 100%)', href: 'wheel.html' },
   ],
-  slots: [
-    { name: 'Sweet Bonanza', emoji: '🍬', gradient: 'linear-gradient(180deg, #f472b6 0%, #db2777 55%, #831843 100%)', badge: 'hot' },
-    { name: 'Gates of Olympus', emoji: '⚡', gradient: 'linear-gradient(180deg, #fde68a 0%, #f59e0b 55%, #78350f 100%)', badge: 'hot' },
-    { name: 'Wanted Dead', emoji: '🤠', gradient: 'linear-gradient(180deg, #d97706 0%, #92400e 55%, #451a03 100%)' },
-    { name: 'Sugar Rush', emoji: '🍭', gradient: 'linear-gradient(180deg, #f9a8d4 0%, #ec4899 55%, #9d174d 100%)' },
-    { name: 'Big Bass Bonanza', emoji: '🐟', gradient: 'linear-gradient(180deg, #67e8f9 0%, #0891b2 55%, #164e63 100%)' },
-    { name: 'Starlight Princess', emoji: '👸', gradient: 'linear-gradient(180deg, #e9d5ff 0%, #a855f7 55%, #6b21a8 100%)' },
-    { name: 'Book of Dead', emoji: '📖', gradient: 'linear-gradient(180deg, #fbbf24 0%, #d97706 55%, #78350f 100%)' },
-    { name: 'Fruit Party', emoji: '🍇', gradient: 'linear-gradient(180deg, #a3e635 0%, #65a30d 55%, #365314 100%)' },
-  ],
-  newReleases: [
-    { name: 'Monopoly Live', emoji: '🏠', gradient: 'linear-gradient(180deg, #93c5fd 0%, #3b82f6 55%, #1e3a8a 100%)', badge: 'new' },
-    { name: 'Surrender or War', cover: 'war', gradient: 'linear-gradient(180deg, #f87171 0%, #dc2626 55%, #7f1d1d 100%)', badge: 'new', href: 'war.html' },
-    { name: 'Le Bandit', emoji: '🦝', gradient: 'linear-gradient(180deg, #a8a29e 0%, #57534e 55%, #292524 100%)', badge: 'new' },
-    { name: 'Mental', emoji: '🧠', gradient: 'linear-gradient(180deg, #d946ef 0%, #a21caf 55%, #701a75 100%)', badge: 'new' },
-    { name: 'Chaos Crew 2', emoji: '💀', gradient: 'linear-gradient(180deg, #94a3b8 0%, #475569 55%, #1e293b 100%)', badge: 'new' },
-  ],
   live: [
     { name: 'Crazy Time', emoji: '🎡', gradient: 'linear-gradient(180deg, #fb7185 0%, #e11d48 55%, #881337 100%)', badge: 'live' },
     { name: 'Lightning Roulette', emoji: '⚡', gradient: 'linear-gradient(180deg, #fef08a 0%, #eab308 55%, #713f12 100%)', badge: 'live' },

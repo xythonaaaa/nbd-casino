@@ -476,19 +476,21 @@ function rebuildSevenTvEmotePattern() {
   }
   const escaped = names.map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   const alternation = escaped.join('|');
-  sevenTvEmotePattern = new RegExp(`:(${alternation}):|(^|\\s)(${alternation})(?=[\\s$.,!?;:])`, 'g');
+  // Bare names: word boundaries (not inside HELLO). Optional legacy :Name: syntax.
+  sevenTvEmotePattern = new RegExp(
+    `(?::(${alternation}):)|(?<![A-Za-z0-9])(${alternation})(?![A-Za-z0-9])`,
+    'g'
+  );
 }
 
 function formatChatMessageText(text) {
   const escaped = escapeHtml(text);
   if (!sevenTvEmoteMap.size || !sevenTvEmotePattern) return escaped;
-  return escaped.replace(sevenTvEmotePattern, (match, colonName, prefix, spaceName) => {
-    const name = colonName || spaceName;
+  return escaped.replace(sevenTvEmotePattern, (match, colonName, bareName) => {
+    const name = colonName || bareName;
     const emote = sevenTvEmoteMap.get(name);
     if (!emote) return match;
-    const img = buildSevenTvEmoteImg(emote);
-    if (spaceName) return `${prefix || ''}${img}`;
-    return img;
+    return buildSevenTvEmoteImg(emote);
   });
 }
 
@@ -659,10 +661,14 @@ function renderChatEmotePickerGrid() {
 
 function insertChatEmoteName(input, name) {
   if (!input || !name) return;
-  const token = `:${name}:`;
   const start = input.selectionStart ?? input.value.length;
   const end = input.selectionEnd ?? input.value.length;
-  const next = `${input.value.slice(0, start)}${token}${input.value.slice(end)}`;
+  const before = input.value.slice(0, start);
+  const after = input.value.slice(end);
+  const needsSpaceBefore = before.length > 0 && !/[\s.,!?;:]$/.test(before);
+  const needsSpaceAfter = after.length > 0 && !/^[\s.,!?;:]/.test(after);
+  const token = `${needsSpaceBefore ? ' ' : ''}${name}${needsSpaceAfter ? ' ' : ''}`;
+  const next = `${before}${token}${after}`;
   input.value = next.slice(0, CHAT_MAX_LENGTH);
   const caret = Math.min(start + token.length, input.value.length);
   input.setSelectionRange(caret, caret);

@@ -2450,6 +2450,10 @@ function closeRewardsPopout() {
 }
 
 function openRewardsPopout() {
+  if (!isLoggedIn()) {
+    openAuthModal('register');
+    return;
+  }
   closeUserPopout();
   const walletDropdown = document.getElementById('walletDropdown');
   if (walletDropdown && !walletDropdown.hidden) {
@@ -2463,6 +2467,8 @@ function openRewardsPopout() {
   popout.hidden = false;
   btn.setAttribute('aria-expanded', 'true');
 }
+
+window.openRewardsPopout = openRewardsPopout;
 
 function closeUserPopout() {
   const dropdown = document.getElementById('userDropdown');

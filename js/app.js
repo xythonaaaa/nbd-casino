@@ -13,22 +13,44 @@ function renderProviders() {
   });
 }
 
+const PROMO_ACTIONS = {
+  originals: () => { window.location.href = 'originals.html'; },
+  war: () => { window.location.href = 'war.html'; },
+  plinko: () => { window.location.href = 'plinko.html'; },
+  rewards: () => {
+    if (window.XythonAuth?.isLoggedIn?.()) {
+      window.openRewardsPopout?.();
+      return;
+    }
+    window.openAuthModal?.('register');
+  },
+};
+
+function handlePromoAction(action) {
+  PROMO_ACTIONS[action]?.();
+}
+
 function initCarousel() {
   const carousel = document.getElementById('promoCarousel');
-  const slides = document.querySelectorAll('.promo-slide');
+  const slides = carousel?.querySelectorAll('.promo-slide');
   const dotsContainer = document.getElementById('carouselDots');
   const prevBtn = document.getElementById('carouselPrev');
   const nextBtn = document.getElementById('carouselNext');
-  if (!carousel || !slides.length) return;
+  if (!carousel || !slides?.length || !dotsContainer || !prevBtn || !nextBtn) return;
 
   let current = 0;
   let interval;
 
   slides.forEach((_, i) => {
     const dot = document.createElement('button');
+    dot.type = 'button';
     dot.className = `carousel-dot${i === 0 ? ' active' : ''}`;
     dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
-    dot.addEventListener('click', () => goTo(i));
+    dot.addEventListener('click', (e) => {
+      e.stopPropagation();
+      goTo(i);
+      restartAuto();
+    });
     dotsContainer.appendChild(dot);
   });
 
@@ -45,15 +67,37 @@ function initCarousel() {
   function next() { goTo(current + 1); }
   function prev() { goTo(current - 1); }
 
-  prevBtn.addEventListener('click', prev);
-  nextBtn.addEventListener('click', next);
+  prevBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    prev();
+    restartAuto();
+  });
+
+  nextBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    next();
+    restartAuto();
+  });
+
+  carousel.querySelectorAll('[data-promo-action]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handlePromoAction(btn.dataset.promoAction);
+    });
+  });
 
   function startAuto() {
+    stopAuto();
     interval = setInterval(next, 5000);
   }
 
   function stopAuto() {
     clearInterval(interval);
+  }
+
+  function restartAuto() {
+    stopAuto();
+    startAuto();
   }
 
   carousel.addEventListener('mouseenter', stopAuto);

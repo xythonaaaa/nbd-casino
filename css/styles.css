@@ -4518,6 +4518,18 @@ input {
 
 .chat-msg .chat-text {
   color: var(--text-secondary);
+  word-break: break-word;
+}
+
+.chat-emote {
+  display: inline-block;
+  height: 1.75em;
+  width: auto;
+  max-width: 6em;
+  margin: 0 1px;
+  vertical-align: middle;
+  object-fit: contain;
+  pointer-events: none;
 }
 
 .chat-input-wrap {
@@ -4538,6 +4550,108 @@ input {
 
 .chat-input-wrap input:focus {
   border-color: var(--accent);
+}
+
+.chat-emote-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+
+.chat-emote-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.chat-emote-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.chat-emote-picker {
+  position: fixed;
+  z-index: 1400;
+  width: 280px;
+  max-height: min(320px, 50vh);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated, #0f0a18);
+  border: 1px solid rgba(253, 224, 71, 0.15);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.chat-emote-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.chat-emote-picker-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.chat-emote-picker-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.chat-emote-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  padding: 8px;
+  overflow-y: auto;
+}
+
+.chat-emote-picker-item {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  transition: background var(--transition), transform var(--transition);
+}
+
+.chat-emote-picker-item:hover {
+  background: rgba(147, 51, 234, 0.2);
+  transform: scale(1.05);
+}
+
+.chat-emote-picker-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.chat-emote-picker-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 16px 8px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .chat-send {

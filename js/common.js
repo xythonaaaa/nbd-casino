@@ -2,6 +2,9 @@ const CHAT_STORAGE_KEY = 'nbd-chat-v1';
 const CHAT_MAX_MESSAGES = 200;
 const CHAT_MAX_LENGTH = 240;
 const CHAT_POLL_MS = 3000;
+const SEVEN_TV_EMOTES_CACHE_KEY = 'nbd-7tv-emotes-v1';
+const SEVEN_TV_EMOTES_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const SEVEN_TV_GLOBAL_SET_URL = 'https://7tv.io/v3/emote-sets/global';
 
 const PANEL_STORAGE_KEY = 'xython-panel-open';
 const WALLET_STORAGE_KEY = 'xython-wallet';
@@ -447,6 +450,222 @@ function initLiveBets() {
 let chatCache = [];
 let chatUsingServer = false;
 let chatPollTimer = null;
+let sevenTvEmoteMap = new Map();
+let sevenTvEmotePattern = null;
+let chatEmotePickerEl = null;
+let chatEmotePickerInput = null;
+
+function buildSevenTvEmoteUrl(emoteId) {
+  return `https://cdn.7tv.app/emote/${emoteId}/2x.webp`;
+}
+
+function buildSevenTvEmoteImg(emote) {
+  const src = escapeHtml(emote.url);
+  const alt = escapeHtml(emote.name);
+  return `<img class="chat-emote" src="${src}" alt="${alt}" title="${alt}" loading="lazy" decoding="async">`;
+}
+
+function rebuildSevenTvEmotePattern() {
+  const names = [...sevenTvEmoteMap.keys()].sort((a, b) => b.length - a.length);
+  if (!names.length) {
+    sevenTvEmotePattern = null;
+    return;
+  }
+  const escaped = names.map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const alternation = escaped.join('|');
+  sevenTvEmotePattern = new RegExp(`:(${alternation}):|(^|\\s)(${alternation})(?=[\\s$.,!?;:])`, 'g');
+}
+
+function formatChatMessageText(text) {
+  const escaped = escapeHtml(text);
+  if (!sevenTvEmoteMap.size || !sevenTvEmotePattern) return escaped;
+  return escaped.replace(sevenTvEmotePattern, (match, colonName, prefix, spaceName) => {
+    const name = colonName || spaceName;
+    const emote = sevenTvEmoteMap.get(name);
+    if (!emote) return match;
+    const img = buildSevenTvEmoteImg(emote);
+    if (spaceName) return `${prefix || ''}${img}`;
+    return img;
+  });
+}
+
+function applySevenTvEmotes(emotes) {
+  sevenTvEmoteMap = new Map();
+  for (const emote of emotes) {
+    if (emote?.name && emote?.url) sevenTvEmoteMap.set(emote.name, emote);
+  }
+  rebuildSevenTvEmotePattern();
+}
+
+async function loadSevenTvEmotes() {
+  try {
+    const raw = localStorage.getItem(SEVEN_TV_EMOTES_CACHE_KEY);
+    if (raw) {
+      const cached = JSON.parse(raw);
+      if (
+        cached?.ts
+        && Date.now() - cached.ts < SEVEN_TV_EMOTES_CACHE_TTL_MS
+        && Array.isArray(cached.emotes)
+        && cached.emotes.length
+      ) {
+        applySevenTvEmotes(cached.emotes);
+        return sevenTvEmoteMap.size;
+      }
+    }
+  } catch { /* ignore */ }
+
+  try {
+    const res = await fetch(SEVEN_TV_GLOBAL_SET_URL);
+    if (!res.ok) return sevenTvEmoteMap.size;
+    const data = await res.json();
+    const emotes = (Array.isArray(data.emotes) ? data.emotes : [])
+      .map(entry => {
+        const name = entry.name || entry.data?.name;
+        const id = entry.id || entry.data?.id;
+        if (!name || !id) return null;
+        return { name, id, url: buildSevenTvEmoteUrl(id) };
+      })
+      .filter(Boolean);
+    applySevenTvEmotes(emotes);
+    if (emotes.length) {
+      localStorage.setItem(SEVEN_TV_EMOTES_CACHE_KEY, JSON.stringify({
+        ts: Date.now(),
+        emotes,
+      }));
+    }
+  } catch { /* ignore */ }
+  return sevenTvEmoteMap.size;
+}
+
+function ensureChatEmotePicker() {
+  if (chatEmotePickerEl) return chatEmotePickerEl;
+
+  const picker = document.createElement('div');
+  picker.className = 'chat-emote-picker';
+  picker.hidden = true;
+  picker.innerHTML = `
+    <div class="chat-emote-picker-header">
+      <span>7TV Emotes</span>
+      <button type="button" class="chat-emote-picker-close" aria-label="Close emote picker">&times;</button>
+    </div>
+    <div class="chat-emote-picker-grid"></div>
+  `;
+  document.body.appendChild(picker);
+
+  picker.querySelector('.chat-emote-picker-close')?.addEventListener('click', closeChatEmotePicker);
+  document.addEventListener('click', e => {
+    if (!picker.hidden && !e.target.closest('.chat-emote-picker, .chat-emote-btn')) {
+      closeChatEmotePicker();
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeChatEmotePicker();
+  });
+
+  chatEmotePickerEl = picker;
+  return picker;
+}
+
+function renderChatEmotePickerGrid() {
+  const picker = ensureChatEmotePicker();
+  const grid = picker.querySelector('.chat-emote-picker-grid');
+  if (!grid) return;
+
+  const emotes = [...sevenTvEmoteMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+  if (!emotes.length) {
+    grid.innerHTML = '<p class="chat-emote-picker-empty">Emotes unavailable</p>';
+    return;
+  }
+
+  grid.innerHTML = emotes.map(emote => `
+    <button type="button" class="chat-emote-picker-item" data-emote-name="${escapeHtml(emote.name)}" title="${escapeHtml(emote.name)}">
+      <img src="${escapeHtml(emote.url)}" alt="${escapeHtml(emote.name)}" loading="lazy" decoding="async">
+    </button>
+  `).join('');
+
+  grid.querySelectorAll('.chat-emote-picker-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const name = btn.dataset.emoteName || '';
+      if (!name || !chatEmotePickerInput) return;
+      insertChatEmoteName(chatEmotePickerInput, name);
+      closeChatEmotePicker();
+      chatEmotePickerInput.focus();
+    });
+  });
+}
+
+function insertChatEmoteName(input, name) {
+  if (!input || !name) return;
+  const token = `:${name}:`;
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? input.value.length;
+  const next = `${input.value.slice(0, start)}${token}${input.value.slice(end)}`;
+  input.value = next.slice(0, CHAT_MAX_LENGTH);
+  const caret = Math.min(start + token.length, input.value.length);
+  input.setSelectionRange(caret, caret);
+}
+
+function openChatEmotePicker(anchorBtn, input) {
+  if (!isLoggedIn() || !sevenTvEmoteMap.size) return;
+  const picker = ensureChatEmotePicker();
+  chatEmotePickerInput = input;
+  renderChatEmotePickerGrid();
+  picker.hidden = false;
+
+  const rect = anchorBtn.getBoundingClientRect();
+  const pickerWidth = 280;
+  const left = Math.min(
+    Math.max(12, rect.right - pickerWidth),
+    window.innerWidth - pickerWidth - 12
+  );
+  const top = Math.max(12, rect.top - picker.offsetHeight - 8);
+  const bottomFallback = rect.bottom + 8;
+  picker.style.left = `${left}px`;
+  picker.style.top = top > 12
+    ? `${top}px`
+    : `${Math.min(bottomFallback, window.innerHeight - picker.offsetHeight - 12)}px`;
+}
+
+function closeChatEmotePicker() {
+  if (!chatEmotePickerEl) return;
+  chatEmotePickerEl.hidden = true;
+  chatEmotePickerInput = null;
+}
+
+function injectChatEmoteButtons() {
+  document.querySelectorAll('.chat-input-wrap').forEach(wrap => {
+    if (wrap.querySelector('.chat-emote-btn')) return;
+    const input = wrap.querySelector('input[type="text"]');
+    const sendBtn = wrap.querySelector('.chat-send');
+    if (!input) return;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'chat-emote-btn';
+    btn.setAttribute('aria-label', 'Insert 7TV emote');
+    btn.setAttribute('title', '7TV emotes');
+    btn.disabled = !isLoggedIn();
+    btn.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+        <line x1="9" y1="9" x2="9.01" y2="9"/>
+        <line x1="15" y1="9" x2="15.01" y2="9"/>
+      </svg>
+    `;
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (chatEmotePickerEl && !chatEmotePickerEl.hidden && chatEmotePickerInput === input) {
+        closeChatEmotePicker();
+        return;
+      }
+      openChatEmotePicker(btn, input);
+    });
+
+    if (sendBtn) wrap.insertBefore(btn, sendBtn);
+    else wrap.appendChild(btn);
+  });
+}
 
 function getChatApiUrl() {
   if (window.NBD_CHAT_API) return window.NBD_CHAT_API;
@@ -621,7 +840,7 @@ function renderChatMessages(container) {
     const deleteBtn = showDelete && msg.id
       ? `<button type="button" class="chat-delete-btn" data-message-id="${escapeHtml(msg.id)}" aria-label="Delete message" title="Delete message">&times;</button>`
       : '';
-    return `<div class="chat-msg"><div class="chat-msg-body"><span class="chat-user">${escapeHtml(msg.user)}:</span><span class="chat-text">${escapeHtml(msg.text)}</span></div>${deleteBtn}</div>`;
+    return `<div class="chat-msg"><div class="chat-msg-body"><span class="chat-user">${escapeHtml(msg.user)}:</span><span class="chat-text">${formatChatMessageText(msg.text)}</span></div>${deleteBtn}</div>`;
   }).join('');
   container.scrollTop = container.scrollHeight;
 }
@@ -639,6 +858,9 @@ function updateChatInputState() {
   });
   document.querySelectorAll('#chatSend, #chatWidgetSend').forEach(btn => {
     btn.disabled = !isLoggedIn();
+  });
+  document.querySelectorAll('.chat-emote-btn').forEach(btn => {
+    btn.disabled = !isLoggedIn() || !sevenTvEmoteMap.size;
   });
 }
 
@@ -718,6 +940,7 @@ function injectChatWidget() {
     </div>
   `;
   document.body.appendChild(widget);
+  injectChatEmoteButtons();
 
   document.getElementById('chatWidgetToggle')?.addEventListener('click', () => {
     widget.classList.toggle('is-open');
@@ -771,6 +994,7 @@ function ensureLiveChatNav() {
 function initChat() {
   initChatSync();
   injectChatWidget();
+  injectChatEmoteButtons();
   ensureLiveChatNav();
   startChatPolling();
 
@@ -791,6 +1015,10 @@ function initChat() {
     });
   });
 
+  loadSevenTvEmotes().then(() => {
+    renderChat();
+    updateChatInputState();
+  });
   updateChatInputState();
 }
 

@@ -5,14 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
-  <title>Hi-Lo | NBD Casino</title>
+  <title>Leaderboard | NBD Casino</title>
+  <meta name="description" content="See the top NBD Casino Originals winners — total profit, biggest wins, and win counts updated live.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
-  <link rel="stylesheet" href="/css/hilo.css">
+  <link rel="stylesheet" href="/css/leaderboard.css">
 </head>
-<body data-page="originals">
+<body data-page="leaderboard">
   <div class="app">
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
@@ -38,12 +39,13 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
+
       <nav class="sidebar-nav">
         <a href="index.html" class="nav-item" data-nav="casino">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
           Casino
         </a>
-        <a href="originals.html" class="nav-item active" data-nav="originals">
+        <a href="originals.html" class="nav-item" data-nav="originals">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
           Originals
         </a>
@@ -51,7 +53,20 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 010-5H6M18 9h1.5a2.5 2.5 0 000-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0012 0V2z"/></svg>
           Leaderboard
         </a>
+        <a href="index.html#chatPanel" class="nav-item" data-nav="support">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Live Chat
+        </a>
       </nav>
+
+      <div class="sidebar-section">
+        <span class="sidebar-label">Language</span>
+        <button class="lang-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+          English
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </div>
     </aside>
 
     <div class="main-wrapper">
@@ -60,14 +75,38 @@
           <button class="hamburger" id="hamburger" aria-label="Open menu">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
           </button>
-          <a href="originals.html" class="hl-back">← Originals</a>
+
+          <a href="index.html" class="header-brand">
+            <svg class="logo-icon" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+              <rect x="2" y="2" width="28" height="28" rx="6.5" fill="url(#headerLogoGrad)"/>
+              <text x="16" y="20" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700" fill="url(#headerLogoTextGrad)" letter-spacing="-0.1">NBD</text>
+              <defs>
+                <linearGradient id="headerLogoGrad" x1="2" y1="2" x2="30" y2="30">
+                  <stop stop-color="#7c3aed"/>
+                  <stop offset="0.5" stop-color="#4c1d95"/>
+                  <stop offset="1" stop-color="#12041f"/>
+                </linearGradient>
+                <linearGradient id="headerLogoTextGrad" x1="11" y1="12" x2="21" y2="20">
+                  <stop stop-color="#ffffff"/>
+                  <stop offset="1" stop-color="#fde68a"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <span class="header-brand-text">NBD Casino</span>
+          </a>
+
+          <div class="header-tabs">
+            <a href="index.html" class="header-tab active">Casino</a>
+            <a href="#" class="header-tab">Sports</a>
+          </div>
         </div>
+
         <div class="header-center">
           <div class="header-wallet">
             <button class="wallet-balance" id="walletBalance" type="button" aria-haspopup="true" aria-expanded="false">
-              <span class="wallet-currency-icon">$</span>
+              <span class="wallet-currency-icon" aria-hidden="true">$</span>
               <span class="wallet-amount" id="walletAmount">0.00</span>
-              <svg class="wallet-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+              <svg class="wallet-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
             </button>
             <button class="wallet-deposit" id="walletDeposit" type="button">Deposit</button>
             <div class="wallet-dropdown" id="walletDropdown" hidden>
@@ -78,101 +117,53 @@
             </div>
           </div>
         </div>
+
         <div class="header-actions">
           <button class="btn btn-ghost">Log In</button>
           <button class="btn btn-primary">Register</button>
         </div>
       </header>
 
-      <div class="hl-game">
-        <aside class="hl-panel">
-          <div class="hl-field">
-            <div class="hl-field-head">
-              <label for="hlBet">Bet Amount</label>
-              <span id="hlBetCurrency">0.00 USD</span>
-            </div>
-            <div class="hl-bet-row">
-              <div class="hl-bet-input-wrap">
-                <span class="hl-bet-icon">$</span>
-                <input type="number" id="hlBet" class="hl-bet-input" min="0" step="0.01" value="10" placeholder="0.00">
-              </div>
-              <button type="button" class="hl-bet-adjust" id="hlHalf">1/2</button>
-              <button type="button" class="hl-bet-adjust" id="hlDouble">2x</button>
-            </div>
-          </div>
+      <div class="content-area">
+        <main class="main-content leaderboard-main">
+          <section class="leaderboard-hero">
+            <span class="promo-badge">Top Winners</span>
+            <h1>Leaderboard</h1>
+            <p>Ranked by net profit from winning rounds on NBD Originals. Updates automatically every few seconds.</p>
+          </section>
 
-          <div class="hl-stats">
-            <div class="hl-stat">
-              <span class="hl-stat-label">Multiplier</span>
-              <span class="hl-stat-value" id="hlMultiplier">1.00x</span>
+          <div class="leaderboard-toolbar">
+            <div class="leaderboard-filters" role="tablist" aria-label="Leaderboard scope">
+              <button type="button" class="leaderboard-filter active" data-filter="originals" role="tab" aria-selected="true">Originals</button>
+              <button type="button" class="leaderboard-filter" data-filter="all" role="tab" aria-selected="false">All Games</button>
             </div>
-            <div class="hl-stat">
-              <span class="hl-stat-label">Streak</span>
-              <span class="hl-stat-value" id="hlStreak">0</span>
-            </div>
-            <div class="hl-stat">
-              <span class="hl-stat-label">Cash Out</span>
-              <span class="hl-stat-value hl-stat-value--blue" id="hlCashout">$0.00</span>
+            <div class="leaderboard-meta">
+              <span class="live-dot" aria-hidden="true"></span>
+              <span id="leaderboardMeta">Loading…</span>
             </div>
           </div>
 
-          <button type="button" class="hl-action" id="hlStartBtn">Start Round</button>
-          <button type="button" class="hl-action hl-action--cashout" id="hlCashoutBtn" hidden>Cash Out</button>
-
-          <p class="hl-message" id="hlMessage"></p>
-        </aside>
-
-        <main class="hl-board">
-          <div class="hl-board-inner">
-            <div class="hl-stage" id="hlStage">
-              <div class="hl-card-wrap">
-                <div class="hl-playing-card hl-playing-card--empty" id="hlCard">
-                  <span class="hl-pcard-idle">—</span>
-                  <span class="hl-card-label">Current</span>
-                </div>
-                <div class="hl-next-preview" id="hlNextPreview" hidden>
-                  <span class="hl-next-arrow">→</span>
-                  <div class="hl-playing-card hl-playing-card--next" id="hlNextCard"></div>
-                </div>
-              </div>
-
-              <div class="hl-guess-row" id="hlGuessRow" hidden>
-                <button type="button" class="hl-guess hl-guess--lo" id="hlLo">
-                  <span class="hl-guess-icon">↓</span>
-                  <span class="hl-guess-label">Lower</span>
-                  <span class="hl-guess-chance" id="hlLoChance">0%</span>
-                  <span class="hl-guess-mult" id="hlLoMult">—</span>
-                </button>
-                <button type="button" class="hl-guess hl-guess--hi" id="hlHi">
-                  <span class="hl-guess-icon">↑</span>
-                  <span class="hl-guess-label">Higher</span>
-                  <span class="hl-guess-chance" id="hlHiChance">0%</span>
-                  <span class="hl-guess-mult" id="hlHiMult">—</span>
-                </button>
-              </div>
-
-              <p class="hl-status" id="hlStatus">Place your bet and start a round</p>
+          <div class="leaderboard-card">
+            <div class="leaderboard-table-wrap">
+              <table class="leaderboard-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Rank</th>
+                    <th scope="col">Player</th>
+                    <th scope="col">Total Won</th>
+                    <th scope="col">Biggest Win</th>
+                    <th scope="col">Wins</th>
+                  </tr>
+                </thead>
+                <tbody id="leaderboardBody"></tbody>
+              </table>
             </div>
-
-            <div class="hl-result-popup" id="hlResultPopup" hidden>
-              <div class="hl-result-popup-card" id="hlResultCard">
-                <p class="hl-result-popup-label" id="hlPopupLabel"></p>
-                <div class="hl-result-popup-mult" id="hlPopupMult"></div>
-                <p class="hl-result-popup-text" id="hlPopupText"></p>
-              </div>
+            <div class="leaderboard-empty" id="leaderboardEmpty" hidden>
+              <strong>No winners yet</strong>
+              Play an Originals game and land a win to appear on the board.
             </div>
-          </div>
-          <div class="hl-footer">
-            <span class="hl-brand">NBD</span>
           </div>
         </main>
-
-        <aside class="hl-history" aria-label="Recent rounds">
-          <span class="hl-history-head">Recent</span>
-          <div class="hl-history-list" id="hlHistoryList">
-            <p class="hl-history-empty">No rounds yet</p>
-          </div>
-        </aside>
       </div>
     </div>
   </div>
@@ -180,6 +171,6 @@
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
   <script src="/js/common.js"></script>
-  <script src="/js/hilo.js"></script>
+  <script src="/js/leaderboard.js"></script>
 </body>
 </html>

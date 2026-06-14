@@ -1185,6 +1185,11 @@ input {
   line-height: 1.45;
 }
 
+.admin-panel-main[hidden],
+.admin-panel-players[hidden] {
+  display: none !important;
+}
+
 .admin-panel-main {
   display: flex;
   flex-direction: column;
@@ -1254,6 +1259,18 @@ input {
 .admin-panel-item:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.admin-panel-item--featured {
+  background: rgba(147, 51, 234, 0.06);
+}
+
+.admin-panel-item--featured:hover:not(:disabled) {
+  background: rgba(147, 51, 234, 0.12);
+}
+
+.admin-panel-item--featured .admin-panel-item-label {
+  color: var(--accent-light);
 }
 
 .admin-panel-item--danger:hover:not(:disabled) {

@@ -80,7 +80,8 @@ function getAdminPlayersApiUrl() {
 
 async function fetchAdminPlayers() {
   const url = getAdminPlayersApiUrl();
-  if (!url || !isAdmin()) return null;
+  if (!url) return { ok: false, data: { error: 'Player list API is unavailable on this page.' } };
+  if (!isAdmin()) return { ok: false, data: { error: 'Admin access required.' } };
   try {
     const admin = encodeURIComponent(getLoggedInUsername());
     const res = await fetch(`${url}?admin=${admin}`, { cache: 'no-store' });
@@ -88,7 +89,7 @@ async function fetchAdminPlayers() {
     if (!res.ok) return { ok: false, data };
     return { ok: true, data };
   } catch {
-    return null;
+    return { ok: false, data: { error: 'Network error while loading players.' } };
   }
 }
 
@@ -3977,10 +3978,10 @@ function initAdminPanelModal() {
         <section class="admin-panel-group">
           <h3 class="admin-panel-group-title">Player tools</h3>
           <div class="admin-panel-list">
-            <button type="button" class="admin-panel-item" id="adminPanelViewPlayers">
+            <button type="button" class="admin-panel-item admin-panel-item--featured" id="adminPanelRegisteredPlayers">
               <span class="admin-panel-item-body">
-                <span class="admin-panel-item-label">View Players</span>
-                <span class="admin-panel-item-desc">Browse registered players and stats</span>
+                <span class="admin-panel-item-label">Registered players</span>
+                <span class="admin-panel-item-desc">Open the full player list with balances and stats</span>
               </span>
               <svg class="admin-panel-item-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
             </button>
@@ -4050,9 +4051,7 @@ function initAdminPanelModal() {
                 <th></th>
               </tr>
             </thead>
-            <tbody id="adminPanelPlayersBody">
-              <tr><td colspan="9" class="admin-panel-players-empty">Loading…</td></tr>
-            </tbody>
+            <tbody id="adminPanelPlayersBody"></tbody>
           </table>
         </div>
       </div>
@@ -4064,7 +4063,7 @@ function initAdminPanelModal() {
 
   const overlay = document.getElementById('adminPanelOverlay');
   const closeBtn = document.getElementById('adminPanelClose');
-  const viewPlayersBtn = document.getElementById('adminPanelViewPlayers');
+  const registeredPlayersBtn = document.getElementById('adminPanelRegisteredPlayers');
   const sendBtn = document.getElementById('adminPanelSendMoney');
   const resetBalancesBtn = document.getElementById('adminPanelResetBalances');
   const resetLeaderboardsBtn = document.getElementById('adminPanelResetLeaderboards');
@@ -4080,6 +4079,7 @@ function initAdminPanelModal() {
   const mainView = document.getElementById('adminPanelMainView');
   const dialog = modal.querySelector('.admin-panel-dialog');
   let adminPlayersCache = [];
+  let playersLoadSeq = 0;
 
   function clearAdminPanelMessages() {
     errorEl.hidden = true;
@@ -4087,17 +4087,21 @@ function initAdminPanelModal() {
   }
 
   function showAdminMainView() {
+    playersLoadSeq += 1;
     mainView.hidden = false;
     playersView.hidden = true;
     dialog?.classList.remove('admin-panel-dialog--wide');
     playersSearch.value = '';
+    playersBody.innerHTML = '';
+    playersCount.textContent = '';
   }
 
   function renderAdminPlayersTable(filter = '') {
     const q = filter.trim().toLowerCase();
-    const rows = adminPlayersCache.filter(p =>
-      !q || p.username.toLowerCase().includes(q)
-    );
+    const rows = adminPlayersCache.filter(p => {
+      const name = String(p?.username || '').trim();
+      return name && (!q || name.toLowerCase().includes(q));
+    });
 
     playersCount.textContent = rows.length === adminPlayersCache.length
       ? `${adminPlayersCache.length} player${adminPlayersCache.length === 1 ? '' : 's'}`
@@ -4109,15 +4113,16 @@ function initAdminPanelModal() {
     }
 
     playersBody.innerHTML = rows.map(p => {
+      const username = String(p.username || '').trim();
       const usd = formatAdminUsd(p.grants?.USD || 0);
       const profit = p.profit || 0;
       const profitClass = profit > 0 ? 'admin-panel-profit--pos' : profit < 0 ? 'admin-panel-profit--neg' : '';
-      const canDelete = !isAdmin(p.username);
+      const canDelete = username && !isAdmin(username);
       const deleteBtn = canDelete
-        ? `<button type="button" class="admin-panel-delete-btn" data-username="${escapeHtml(p.username)}" title="Delete player">Delete</button>`
+        ? `<button type="button" class="admin-panel-delete-btn" data-username="${escapeHtml(username)}" title="Delete player">Delete</button>`
         : '';
       return `<tr>
-        <td class="admin-panel-player-name">${escapeHtml(p.username)}</td>
+        <td class="admin-panel-player-name">${escapeHtml(username)}</td>
         <td>${usd}</td>
         <td>${p.bets || 0}</td>
         <td>${formatAdminUsd(p.wagered || 0)}</td>
@@ -4139,15 +4144,23 @@ function initAdminPanelModal() {
     playersBody.innerHTML = '<tr><td colspan="9" class="admin-panel-players-empty">Loading…</td></tr>';
     playersCount.textContent = '';
 
-    const result = await fetchAdminPlayers();
-    if (!result?.ok) {
-      playersBody.innerHTML = `<tr><td colspan="9" class="admin-panel-players-empty">${escapeHtml(result?.data?.error || 'Could not load players.')}</td></tr>`;
-      return;
-    }
+    const loadSeq = ++playersLoadSeq;
+    try {
+      const result = await fetchAdminPlayers();
+      if (loadSeq !== playersLoadSeq || playersView.hidden) return;
 
-    adminPlayersCache = Array.isArray(result.data?.players) ? result.data.players : [];
-    renderAdminPlayersTable();
-    playersSearch.focus();
+      if (!result?.ok) {
+        playersBody.innerHTML = `<tr><td colspan="9" class="admin-panel-players-empty">${escapeHtml(result?.data?.error || 'Could not load players.')}</td></tr>`;
+        return;
+      }
+
+      adminPlayersCache = Array.isArray(result.data?.players) ? result.data.players : [];
+      renderAdminPlayersTable();
+      playersSearch.focus();
+    } catch {
+      if (loadSeq !== playersLoadSeq || playersView.hidden) return;
+      playersBody.innerHTML = '<tr><td colspan="9" class="admin-panel-players-empty">Could not load players.</td></tr>';
+    }
   }
 
   function closeAdminPanelModal() {
@@ -4165,10 +4178,12 @@ function initAdminPanelModal() {
     document.body.style.overflow = 'hidden';
   };
 
+  window.openAdminPlayersView = openAdminPlayersView;
+
   overlay.addEventListener('click', closeAdminPanelModal);
   closeBtn.addEventListener('click', closeAdminPanelModal);
 
-  viewPlayersBtn.addEventListener('click', () => {
+  registeredPlayersBtn?.addEventListener('click', () => {
     if (!isAdmin()) return;
     openAdminPlayersView();
   });

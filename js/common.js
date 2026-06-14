@@ -3966,56 +3966,75 @@ function initAdminPanelModal() {
       <button class="deposit-close" id="adminPanelClose" type="button" aria-label="Close">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
-      <h2 class="deposit-title" id="adminPanelTitle">Admin Panel</h2>
-      <p class="deposit-subtitle">Site management tools (admin only)</p>
 
-      <div class="admin-panel-actions">
-        <button type="button" class="admin-panel-btn admin-panel-btn--primary" id="adminPanelViewPlayers">
-          <span class="admin-panel-btn-icon">${userMenuIcon('affiliates')}</span>
-          <span class="admin-panel-btn-text">
-            <span class="admin-panel-btn-label">View Players</span>
-            <span class="admin-panel-btn-desc">Browse registered players and stats</span>
-          </span>
-        </button>
-        <button type="button" class="admin-panel-btn admin-panel-btn--primary" id="adminPanelSendMoney">
-          <span class="admin-panel-btn-icon">${userMenuIcon('transactions')}</span>
-          <span class="admin-panel-btn-text">
-            <span class="admin-panel-btn-label">Send Money</span>
-            <span class="admin-panel-btn-desc">Transfer play money to a player</span>
-          </span>
-        </button>
-        <button type="button" class="admin-panel-btn admin-panel-btn--danger" id="adminPanelResetBalances">
-          <span class="admin-panel-btn-icon">${userMenuIcon('vault')}</span>
-          <span class="admin-panel-btn-text">
-            <span class="admin-panel-btn-label">Reset All Balances</span>
-            <span class="admin-panel-btn-desc">Set every player wallet to $0</span>
-          </span>
-        </button>
-        <button type="button" class="admin-panel-btn admin-panel-btn--danger" id="adminPanelResetLeaderboards">
-          <span class="admin-panel-btn-icon">${userMenuIcon('vip')}</span>
-          <span class="admin-panel-btn-text">
-            <span class="admin-panel-btn-label">Reset Originals Leaderboards</span>
-            <span class="admin-panel-btn-desc">Clear wins, bets, and recent bet history</span>
-          </span>
-        </button>
-      </div>
+      <header class="admin-panel-header">
+        <span class="admin-panel-eyebrow">NBD Casino</span>
+        <h2 class="admin-panel-title" id="adminPanelTitle">Admin Panel</h2>
+        <p class="admin-panel-subtitle">Site management tools for administrators</p>
+      </header>
 
-      <div class="admin-panel-section">
-        <label class="deposit-label" for="adminPanelResetPlayerUser">Reset player wallet</label>
-        <input type="text" id="adminPanelResetPlayerUser" class="deposit-input send-money-recipient" maxlength="16" autocomplete="off" placeholder="Player username">
-        <button type="button" class="deposit-submit admin-panel-reset-player-btn" id="adminPanelResetPlayer">Reset Player</button>
+      <div class="admin-panel-main" id="adminPanelMainView">
+        <section class="admin-panel-group">
+          <h3 class="admin-panel-group-title">Player tools</h3>
+          <div class="admin-panel-list">
+            <button type="button" class="admin-panel-item" id="adminPanelViewPlayers">
+              <span class="admin-panel-item-body">
+                <span class="admin-panel-item-label">View Players</span>
+                <span class="admin-panel-item-desc">Browse registered players and stats</span>
+              </span>
+              <svg class="admin-panel-item-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <button type="button" class="admin-panel-item" id="adminPanelSendMoney">
+              <span class="admin-panel-item-body">
+                <span class="admin-panel-item-label">Send Money</span>
+                <span class="admin-panel-item-desc">Transfer play money to a player</span>
+              </span>
+              <svg class="admin-panel-item-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
+        </section>
+
+        <section class="admin-panel-group admin-panel-group--danger">
+          <h3 class="admin-panel-group-title admin-panel-group-title--danger">Danger zone</h3>
+          <div class="admin-panel-list">
+            <button type="button" class="admin-panel-item admin-panel-item--danger" id="adminPanelResetBalances">
+              <span class="admin-panel-item-body">
+                <span class="admin-panel-item-label">Reset All Balances</span>
+                <span class="admin-panel-item-desc">Set every player wallet to $0</span>
+              </span>
+              <svg class="admin-panel-item-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <button type="button" class="admin-panel-item admin-panel-item--danger" id="adminPanelResetLeaderboards">
+              <span class="admin-panel-item-body">
+                <span class="admin-panel-item-label">Reset Originals Leaderboards</span>
+                <span class="admin-panel-item-desc">Clear wins, bets, and recent bet history</span>
+              </span>
+              <svg class="admin-panel-item-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
+
+          <div class="admin-panel-inline">
+            <label class="admin-panel-inline-label" for="adminPanelResetPlayerUser">Reset player wallet</label>
+            <div class="admin-panel-inline-row">
+              <input type="text" id="adminPanelResetPlayerUser" class="deposit-input admin-panel-inline-input" maxlength="16" autocomplete="off" placeholder="Username">
+              <button type="button" class="admin-panel-inline-btn" id="adminPanelResetPlayer">Reset</button>
+            </div>
+          </div>
+        </section>
       </div>
 
       <div class="admin-panel-players" id="adminPanelPlayersView" hidden>
-        <div class="admin-panel-players-header">
+        <div class="admin-panel-players-top">
           <button type="button" class="admin-panel-back-btn" id="adminPanelPlayersBack" aria-label="Back to admin tools">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-            Back
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+            Admin tools
           </button>
           <span class="admin-panel-players-count" id="adminPanelPlayersCount"></span>
         </div>
-        <label class="deposit-label" for="adminPanelPlayersSearch">Search players</label>
-        <input type="search" id="adminPanelPlayersSearch" class="deposit-input admin-panel-players-search" maxlength="16" autocomplete="off" placeholder="Filter by username">
+        <div class="admin-panel-players-toolbar">
+          <h3 class="admin-panel-players-title">Registered players</h3>
+          <input type="search" id="adminPanelPlayersSearch" class="admin-panel-players-search" maxlength="16" autocomplete="off" placeholder="Search username…" aria-label="Search players">
+        </div>
         <div class="admin-panel-players-table-wrap">
           <table class="admin-panel-players-table">
             <thead>
@@ -4058,7 +4077,7 @@ function initAdminPanelModal() {
   const playersSearch = document.getElementById('adminPanelPlayersSearch');
   const playersBody = document.getElementById('adminPanelPlayersBody');
   const playersCount = document.getElementById('adminPanelPlayersCount');
-  const mainSections = modal.querySelectorAll('.admin-panel-actions, .admin-panel-section:not(.admin-panel-players)');
+  const mainView = document.getElementById('adminPanelMainView');
   const dialog = modal.querySelector('.admin-panel-dialog');
   let adminPlayersCache = [];
 
@@ -4068,7 +4087,7 @@ function initAdminPanelModal() {
   }
 
   function showAdminMainView() {
-    mainSections.forEach(el => { el.hidden = false; });
+    mainView.hidden = false;
     playersView.hidden = true;
     dialog?.classList.remove('admin-panel-dialog--wide');
     playersSearch.value = '';
@@ -4114,7 +4133,7 @@ function initAdminPanelModal() {
   async function openAdminPlayersView() {
     if (!isAdmin()) return;
     clearAdminPanelMessages();
-    mainSections.forEach(el => { el.hidden = true; });
+    mainView.hidden = true;
     playersView.hidden = false;
     dialog?.classList.add('admin-panel-dialog--wide');
     playersBody.innerHTML = '<tr><td colspan="9" class="admin-panel-players-empty">Loading…</td></tr>';

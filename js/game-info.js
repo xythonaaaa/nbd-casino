@@ -53,7 +53,7 @@ const GAME_INFO = {
     gradient: 'linear-gradient(180deg, #34d399 0%, #059669 55%, #064e3b 100%)',
     emoji: '🔢',
     tagline: 'Pick numbers and match the draw.',
-    description: 'Select up to 10 numbers on the keno board and watch the draw. More matches mean bigger payouts — classic lottery-style action with instant results.',
+    description: 'Select up to 10 numbers on the 40-spot keno board and watch 10 balls drawn. More matches mean bigger payouts — classic lottery-style action with instant results.',
   },
   limbo: {
     name: 'Limbo',

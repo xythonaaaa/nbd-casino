@@ -1,5 +1,5 @@
-const TOTAL_NUMBERS = 80;
-const DRAW_COUNT = 20;
+const TOTAL_NUMBERS = 40;
+const DRAW_COUNT = 10;
 const MAX_PICKS = 10;
 const HOUSE_EDGE = 0.94;
 const DRAW_DELAY_MS = 90;

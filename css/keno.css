@@ -440,7 +440,7 @@
 }
 
 .kn-grid-wrap {
-  width: min(760px, 100%);
+  width: min(560px, 100%);
 }
 
 .kn-hint {
@@ -457,7 +457,7 @@
 
 .kn-grid {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  grid-template-columns: repeat(8, 1fr);
   gap: 8px;
 }
 
@@ -664,6 +664,6 @@
 
 @media (max-width: 520px) {
   .kn-grid {
-    grid-template-columns: repeat(8, 1fr);
+    grid-template-columns: repeat(5, 1fr);
   }
 }

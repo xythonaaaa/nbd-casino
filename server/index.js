@@ -15,6 +15,9 @@ const AFFILIATE_COMMISSION_RATE = 0.05;
 const AFFILIATE_MIN_CLAIM = 0.01;
 const WALLET_ADMIN_USERNAMES = ['ceo'];
 const WALLET_CURRENCIES = ['USD', 'BTC', 'ETH', 'LTC'];
+const MIN_TIP_USD = 0.01;
+const TIP_COOLDOWN_MS = 2000;
+const SIGNUP_BONUS_USD = 500;
 const ORIGINALS_GAMES = new Set([
   'blackjack', 'plinko', 'roulette', 'dice', 'mines', 'crash',
   'keno', 'limbo', 'war', 'coinflip', 'hilo', 'tower', 'wheel',
@@ -298,7 +301,7 @@ function defaultWalletBalances() {
 }
 
 function defaultWalletStore() {
-  return { users: [], grants: {}, userMeta: {}, resetAt: 0 };
+  return { users: [], grants: {}, balances: {}, userMeta: {}, resetAt: 0 };
 }
 
 function loadWalletStore() {
@@ -307,6 +310,7 @@ function loadWalletStore() {
     return {
       users: Array.isArray(parsed.users) ? parsed.users : [],
       grants: parsed.grants && typeof parsed.grants === 'object' ? parsed.grants : {},
+      balances: parsed.balances && typeof parsed.balances === 'object' ? parsed.balances : {},
       userMeta: parsed.userMeta && typeof parsed.userMeta === 'object' ? parsed.userMeta : {},
       resetAt: Math.max(0, parseInt(parsed.resetAt, 10) || 0),
     };
@@ -337,8 +341,68 @@ function ensureWalletUser(store, username) {
     store.users.push(name);
     if (!store.userMeta) store.userMeta = {};
     if (!store.userMeta[key]) store.userMeta[key] = { registeredAt: Date.now() };
+    if (!store.balances) store.balances = {};
+    if (!store.balances[key]) {
+      store.balances[key] = defaultWalletBalances();
+      store.balances[key].USD = SIGNUP_BONUS_USD;
+    }
   }
   return name;
+}
+
+function resolveWalletUser(store, username) {
+  const key = walletUserKey(username);
+  return store.users.find(u => u.toLowerCase() === key) || null;
+}
+
+function getWalletBalances(store, username) {
+  const key = walletUserKey(username);
+  const raw = store.balances?.[key] || defaultWalletBalances();
+  const balances = defaultWalletBalances();
+  WALLET_CURRENCIES.forEach(cur => {
+    balances[cur] = Math.max(0, parseFloat(raw[cur]) || 0);
+  });
+  return balances;
+}
+
+function getCombinedWalletBalance(store, username) {
+  const grants = getWalletGrants(store, username);
+  const balances = getWalletBalances(store, username);
+  const combined = defaultWalletBalances();
+  WALLET_CURRENCIES.forEach(cur => {
+    combined[cur] = grants[cur] + balances[cur];
+  });
+  return combined;
+}
+
+function ensureWalletBalancesEntry(store, key) {
+  if (!store.balances) store.balances = {};
+  if (!store.balances[key]) store.balances[key] = defaultWalletBalances();
+}
+
+function debitCombinedWallet(store, username, currency, amount) {
+  const key = walletUserKey(username);
+  ensureWalletBalancesEntry(store, key);
+  if (!store.grants[key]) store.grants[key] = defaultWalletBalances();
+
+  let remaining = amount;
+  const grant = parseFloat(store.grants[key][currency]) || 0;
+  const fromGrant = Math.min(grant, remaining);
+  store.grants[key][currency] = grant - fromGrant;
+  remaining -= fromGrant;
+
+  if (remaining > 0) {
+    const balance = parseFloat(store.balances[key][currency]) || 0;
+    if (balance < remaining) return false;
+    store.balances[key][currency] = balance - remaining;
+  }
+  return true;
+}
+
+function creditCombinedWallet(store, username, currency, amount) {
+  const key = walletUserKey(username);
+  ensureWalletBalancesEntry(store, key);
+  store.balances[key][currency] = (parseFloat(store.balances[key][currency]) || 0) + amount;
 }
 
 function getWalletGrants(store, username) {
@@ -369,6 +433,7 @@ function sendWalletMoney(store, admin, to, amount, currency) {
 
 function resetAllWallets(store) {
   store.grants = {};
+  store.balances = {};
   store.resetAt = Date.now();
   return { ok: true, resetAt: store.resetAt };
 }
@@ -382,7 +447,59 @@ function resetPlayerWallet(store, admin, username) {
   if (store.grants[key]) {
     store.grants[key] = defaultWalletBalances();
   }
+  if (store.balances?.[key]) {
+    store.balances[key] = defaultWalletBalances();
+  }
   return { ok: true, username: player, grants: getWalletGrants(store, player) };
+}
+
+function tipWalletPlayer(store, from, to, amount, currency) {
+  const senderRaw = String(from || '').trim().slice(0, 16);
+  const recipientRaw = String(to || '').trim().slice(0, 16);
+
+  if (!senderRaw) return { error: 'Invalid sender' };
+  if (!recipientRaw) return { error: 'Invalid recipient' };
+
+  const cur = String(currency || 'USD').toUpperCase();
+  if (!WALLET_CURRENCIES.includes(cur)) return { error: 'Invalid currency' };
+  if (cur !== 'USD') return { error: 'Tips are USD only' };
+
+  const amt = parseFloat(amount);
+  if (!amt || amt <= 0) return { error: 'Invalid amount' };
+  if (amt < MIN_TIP_USD) return { error: `Minimum tip is $${MIN_TIP_USD.toFixed(2)}` };
+
+  const sender = resolveWalletUser(store, senderRaw);
+  if (!sender) return { error: 'Sender not registered' };
+
+  const recipient = resolveWalletUser(store, recipientRaw);
+  if (!recipient) return { error: 'Recipient not found' };
+
+  if (walletUserKey(sender) === walletUserKey(recipient)) return { error: 'Cannot tip yourself' };
+
+  const senderKey = walletUserKey(sender);
+  if (!store.userMeta) store.userMeta = {};
+  if (!store.userMeta[senderKey]) store.userMeta[senderKey] = { registeredAt: Date.now() };
+  const lastTip = parseInt(store.userMeta[senderKey].lastTipAt, 10) || 0;
+  if (Date.now() - lastTip < TIP_COOLDOWN_MS) return { error: 'Please wait before tipping again' };
+
+  const combined = getCombinedWalletBalance(store, sender);
+  if (combined[cur] < amt) return { error: 'Insufficient balance' };
+
+  if (!debitCombinedWallet(store, sender, cur, amt)) return { error: 'Insufficient balance' };
+  creditCombinedWallet(store, recipient, cur, amt);
+  store.userMeta[senderKey].lastTipAt = Date.now();
+
+  return {
+    ok: true,
+    from: sender,
+    to: recipient,
+    amount: amt,
+    currency: cur,
+    fromGrants: getWalletGrants(store, sender),
+    fromBalances: getWalletBalances(store, sender),
+    toGrants: getWalletGrants(store, recipient),
+    toBalances: getWalletBalances(store, recipient),
+  };
 }
 
 function resetOriginalsLeaderboard(data) {
@@ -660,6 +777,7 @@ function handleWalletRequest(req, res, urlPath) {
     }
     sendJson(res, 200, {
       grants: getWalletGrants(store, user),
+      balances: getWalletBalances(store, user),
       resetAt: store.resetAt || 0,
     });
     return;
@@ -686,6 +804,12 @@ function handleWalletRequest(req, res, urlPath) {
           result = sendWalletMoney(store, payload.admin, payload.to, payload.amount, payload.currency);
           if (result.error) {
             sendJson(res, result.error === 'Admin only' ? 403 : 400, result);
+            return;
+          }
+        } else if (action === 'tip') {
+          result = tipWalletPlayer(store, payload.from, payload.to, payload.amount, payload.currency);
+          if (result.error) {
+            sendJson(res, 400, result);
             return;
           }
         } else if (action === 'reset-all') {

@@ -2,6 +2,8 @@ const CHAT_STORAGE_KEY = 'nbd-chat-v1';
 const CHAT_MAX_MESSAGES = 200;
 const CHAT_MAX_LENGTH = 240;
 const CHAT_POLL_MS = 3000;
+const TIP_CMD_RE = /^\/tip\s+@?(\S+)\s+\$?([\d,.]+)\s*$/i;
+const MIN_TIP_USD = 0.01;
 const SEVEN_TV_EMOTES_CACHE_KEY = 'nbd-7tv-emotes-v2';
 const SEVEN_TV_EMOTES_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const SEVEN_TV_GLOBAL_SET_URL = 'https://7tv.io/v3/emote-sets/global';
@@ -148,10 +150,29 @@ async function fetchServerGrants(username) {
     if (!res.ok) return null;
     const data = await res.json();
     if (data.resetAt) await applyServerWalletReset(data.resetAt);
-    return data.grants && typeof data.grants === 'object' ? data.grants : null;
+    if (!data.grants || typeof data.grants !== 'object') return null;
+    return {
+      grants: data.grants,
+      balances: data.balances && typeof data.balances === 'object' ? data.balances : {},
+    };
   } catch {
     return null;
   }
+}
+
+function getCombinedServerTotal(grants, balances, currency) {
+  return (parseFloat(grants?.[currency]) || 0) + (parseFloat(balances?.[currency]) || 0);
+}
+
+function markServerWalletSynced(username, grants, balances) {
+  if (!username) return;
+  const synced = loadGrantsSynced();
+  const userKey = username.toLowerCase();
+  if (!synced[userKey]) synced[userKey] = { USD: 0, BTC: 0, ETH: 0, LTC: 0 };
+  WALLET_CURRENCIES.forEach(currency => {
+    synced[userKey][currency] = getCombinedServerTotal(grants, balances, currency);
+  });
+  saveGrantsSynced(synced);
 }
 
 function loadWalletResetAck() {
@@ -202,15 +223,16 @@ async function syncWalletGrantsFromServer() {
   const username = getLoggedInUsername();
   if (!username) return;
 
-  const serverGrants = await fetchServerGrants(username);
-  if (!serverGrants) return;
+  const serverWallet = await fetchServerGrants(username);
+  if (!serverWallet) return;
 
+  const { grants: serverGrants, balances: serverBalances } = serverWallet;
   const synced = loadGrantsSynced();
   const userKey = username.toLowerCase();
   if (!synced[userKey]) synced[userKey] = { USD: 0, BTC: 0, ETH: 0, LTC: 0 };
 
   WALLET_CURRENCIES.forEach(currency => {
-    const serverTotal = parseFloat(serverGrants[currency]) || 0;
+    const serverTotal = getCombinedServerTotal(serverGrants, serverBalances, currency);
     const applied = parseFloat(synced[userKey][currency]) || 0;
     const delta = serverTotal - applied;
     if (delta <= 0) return;
@@ -902,6 +924,83 @@ function getChatEmptyMessage() {
   return 'No messages yet. Be the first to say hello! Chat is shared when this site runs on a server.';
 }
 
+function parseTipCommand(text) {
+  const match = String(text || '').trim().match(TIP_CMD_RE);
+  if (!match) return null;
+  const recipient = match[1].replace(/^@/, '');
+  const amount = parseFloat(match[2].replace(/,/g, ''));
+  if (!recipient || !amount || amount <= 0) return null;
+  return { recipient, amount };
+}
+
+function showToast(message, type = 'info') {
+  let container = document.getElementById('xythonToastContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'xythonToastContainer';
+    container.className = 'xython-toast-container';
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  toast.className = `xython-toast xython-toast--${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('is-visible'));
+  setTimeout(() => {
+    toast.classList.remove('is-visible');
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+
+async function executeTip(recipient, amount) {
+  const sender = getLoggedInUsername();
+  if (!sender) return { ok: false, error: 'Log in to tip' };
+
+  const resolved = resolveUsername(recipient) || recipient.trim();
+  const userError = validateUsername(resolved);
+  if (userError) return { ok: false, error: userError };
+
+  if (resolved.toLowerCase() === sender.toLowerCase()) {
+    return { ok: false, error: 'Cannot tip yourself' };
+  }
+
+  if (amount < MIN_TIP_USD) {
+    return { ok: false, error: `Minimum tip is $${MIN_TIP_USD.toFixed(2)}` };
+  }
+
+  const localBalance = getWalletBalance('USD');
+  if (amount > localBalance) return { ok: false, error: 'Insufficient balance' };
+
+  const result = await postWalletAction({
+    action: 'tip',
+    from: sender,
+    to: resolved,
+    amount,
+    currency: 'USD',
+  });
+
+  if (!result?.ok) {
+    return { ok: false, error: result?.data?.error || 'Could not send tip' };
+  }
+
+  const data = result.data;
+  window.XythonWallet.setBalance('USD', localBalance - amount, {
+    type: 'tip',
+    label: 'Tip',
+    detail: `Tipped ${data.to} $${amount.toFixed(2)}`,
+  });
+  markServerWalletSynced(sender, data.fromGrants, data.fromBalances);
+
+  const displaySender = getPublicUsername();
+  const tipMsg = `${displaySender} tipped ${data.to} $${amount.toFixed(2)}`;
+  if (getChatApiUrl()) {
+    await postChatToServer('System', tipMsg);
+    await refreshChatMessages();
+  }
+
+  return { ok: true, message: tipMsg };
+}
+
 function renderChatMessages(container) {
   if (!container) return;
   const messages = loadChatMessages();
@@ -911,9 +1010,13 @@ function renderChatMessages(container) {
   }
   const showDelete = isAdmin();
   container.innerHTML = messages.map(msg => {
-    const deleteBtn = showDelete && msg.id
+    const isSystem = msg.user === 'System';
+    const deleteBtn = showDelete && msg.id && !isSystem
       ? `<button type="button" class="chat-delete-btn" data-message-id="${escapeHtml(msg.id)}" aria-label="Delete message" title="Delete message">&times;</button>`
       : '';
+    if (isSystem) {
+      return `<div class="chat-msg chat-msg--system"><div class="chat-msg-body"><span class="chat-text">${formatChatMessageText(msg.text)}</span></div>${deleteBtn}</div>`;
+    }
     return `<div class="chat-msg"><div class="chat-msg-body"><span class="chat-user">${escapeHtml(msg.user)}:</span><span class="chat-text">${formatChatMessageText(msg.text)}</span></div>${deleteBtn}</div>`;
   }).join('');
   container.scrollTop = container.scrollHeight;
@@ -1037,6 +1140,22 @@ function wireChatInput(input, sendBtn) {
     if (!requireAuth('login')) return;
     const text = input.value.trim();
     if (!text) return;
+
+    const tip = parseTipCommand(text);
+    if (tip) {
+      input.disabled = true;
+      executeTip(tip.recipient, tip.amount).then(result => {
+        input.disabled = !isLoggedIn();
+        input.value = '';
+        if (result.ok) {
+          showToast(result.message, 'success');
+        } else {
+          showToast(result.error, 'error');
+        }
+      });
+      return;
+    }
+
     input.disabled = true;
     addChatMessage(getPublicUsername(), text).finally(() => {
       input.disabled = !isLoggedIn();
@@ -1102,9 +1221,17 @@ window.NbdChat = {
   refresh: refreshChatMessages,
   send: async (text) => {
     if (!requireAuth('login')) return false;
+    const tip = parseTipCommand(text);
+    if (tip) {
+      const result = await executeTip(tip.recipient, tip.amount);
+      if (result.ok) showToast(result.message, 'success');
+      else showToast(result.error, 'error');
+      return result.ok;
+    }
     await addChatMessage(getPublicUsername(), text);
     return true;
   },
+  tip: executeTip,
   open: openLiveChat,
   isShared: () => chatUsingServer,
 };

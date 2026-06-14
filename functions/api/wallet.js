@@ -4,13 +4,16 @@ import { kvGet, kvSet } from '../lib/kv.js';
 
 const STORE_KEY = 'data';
 const VALID_CURRENCIES = ['USD', 'BTC', 'ETH', 'LTC'];
+const MIN_TIP_USD = 0.01;
+const TIP_COOLDOWN_MS = 2000;
+const SIGNUP_BONUS_USD = 500;
 
 function defaultBalances() {
   return { USD: 0, BTC: 0, ETH: 0, LTC: 0 };
 }
 
 function defaultStore() {
-  return { users: [], grants: {}, userMeta: {}, resetAt: 0 };
+  return { users: [], grants: {}, balances: {}, userMeta: {}, resetAt: 0 };
 }
 
 function normalizeStore(raw) {
@@ -18,6 +21,7 @@ function normalizeStore(raw) {
   return {
     users: Array.isArray(data.users) ? data.users : [],
     grants: data.grants && typeof data.grants === 'object' ? data.grants : {},
+    balances: data.balances && typeof data.balances === 'object' ? data.balances : {},
     userMeta: data.userMeta && typeof data.userMeta === 'object' ? data.userMeta : {},
     resetAt: Math.max(0, parseInt(data.resetAt, 10) || 0),
   };
@@ -64,8 +68,68 @@ function ensureUser(store, username) {
     store.users.push(name);
     if (!store.userMeta) store.userMeta = {};
     if (!store.userMeta[key]) store.userMeta[key] = { registeredAt: Date.now() };
+    if (!store.balances) store.balances = {};
+    if (!store.balances[key]) {
+      store.balances[key] = defaultBalances();
+      store.balances[key].USD = SIGNUP_BONUS_USD;
+    }
   }
   return name;
+}
+
+function resolveWalletUser(store, username) {
+  const key = userKey(username);
+  return store.users.find(u => u.toLowerCase() === key) || null;
+}
+
+function getBalancesForUser(store, username) {
+  const key = userKey(username);
+  const raw = store.balances?.[key] || defaultBalances();
+  const balances = defaultBalances();
+  VALID_CURRENCIES.forEach(cur => {
+    balances[cur] = Math.max(0, parseFloat(raw[cur]) || 0);
+  });
+  return balances;
+}
+
+function getCombinedForUser(store, username) {
+  const grants = getGrantsForUser(store, username);
+  const balances = getBalancesForUser(store, username);
+  const combined = defaultBalances();
+  VALID_CURRENCIES.forEach(cur => {
+    combined[cur] = grants[cur] + balances[cur];
+  });
+  return combined;
+}
+
+function ensureBalancesEntry(store, key) {
+  if (!store.balances) store.balances = {};
+  if (!store.balances[key]) store.balances[key] = defaultBalances();
+}
+
+function debitCombined(store, username, currency, amount) {
+  const key = userKey(username);
+  ensureBalancesEntry(store, key);
+  if (!store.grants[key]) store.grants[key] = defaultBalances();
+
+  let remaining = amount;
+  const bal = parseFloat(store.grants[key][currency]) || 0;
+  const fromGrant = Math.min(bal, remaining);
+  store.grants[key][currency] = bal - fromGrant;
+  remaining -= fromGrant;
+
+  if (remaining > 0) {
+    const balance = parseFloat(store.balances[key][currency]) || 0;
+    if (balance < remaining) return false;
+    store.balances[key][currency] = balance - remaining;
+  }
+  return true;
+}
+
+function creditCombined(store, username, currency, amount) {
+  const key = userKey(username);
+  ensureBalancesEntry(store, key);
+  store.balances[key][currency] = (parseFloat(store.balances[key][currency]) || 0) + amount;
 }
 
 function getGrantsForUser(store, username) {
@@ -100,6 +164,7 @@ function sendMoney(store, admin, to, amount, currency) {
 
 function resetAllWallets(store) {
   store.grants = {};
+  store.balances = {};
   store.resetAt = Date.now();
   return { ok: true, resetAt: store.resetAt };
 }
@@ -115,8 +180,60 @@ function resetPlayerWallet(store, admin, username) {
   if (store.grants[key]) {
     store.grants[key] = defaultBalances();
   }
+  if (store.balances?.[key]) {
+    store.balances[key] = defaultBalances();
+  }
 
   return { ok: true, username: player, grants: getGrantsForUser(store, player) };
+}
+
+function tipPlayer(store, from, to, amount, currency) {
+  const senderRaw = String(from || '').trim().slice(0, 16);
+  const recipientRaw = String(to || '').trim().slice(0, 16);
+
+  if (!senderRaw) return { error: 'Invalid sender' };
+  if (!recipientRaw) return { error: 'Invalid recipient' };
+
+  const cur = String(currency || 'USD').toUpperCase();
+  if (!VALID_CURRENCIES.includes(cur)) return { error: 'Invalid currency' };
+  if (cur !== 'USD') return { error: 'Tips are USD only' };
+
+  const amt = parseFloat(amount);
+  if (!amt || amt <= 0) return { error: 'Invalid amount' };
+  if (amt < MIN_TIP_USD) return { error: `Minimum tip is $${MIN_TIP_USD.toFixed(2)}` };
+
+  const sender = resolveWalletUser(store, senderRaw);
+  if (!sender) return { error: 'Sender not registered' };
+
+  const recipient = resolveWalletUser(store, recipientRaw);
+  if (!recipient) return { error: 'Recipient not found' };
+
+  if (userKey(sender) === userKey(recipient)) return { error: 'Cannot tip yourself' };
+
+  const senderKey = userKey(sender);
+  if (!store.userMeta) store.userMeta = {};
+  if (!store.userMeta[senderKey]) store.userMeta[senderKey] = { registeredAt: Date.now() };
+  const lastTip = parseInt(store.userMeta[senderKey].lastTipAt, 10) || 0;
+  if (Date.now() - lastTip < TIP_COOLDOWN_MS) return { error: 'Please wait before tipping again' };
+
+  const combined = getCombinedForUser(store, sender);
+  if (combined[cur] < amt) return { error: 'Insufficient balance' };
+
+  if (!debitCombined(store, sender, cur, amt)) return { error: 'Insufficient balance' };
+  creditCombined(store, recipient, cur, amt);
+  store.userMeta[senderKey].lastTipAt = Date.now();
+
+  return {
+    ok: true,
+    from: sender,
+    to: recipient,
+    amount: amt,
+    currency: cur,
+    fromGrants: getGrantsForUser(store, sender),
+    fromBalances: getBalancesForUser(store, sender),
+    toGrants: getGrantsForUser(store, recipient),
+    toBalances: getBalancesForUser(store, recipient),
+  };
 }
 
 export async function onRequest(context) {
@@ -140,6 +257,7 @@ export async function onRequest(context) {
     }
     return json({
       grants: getGrantsForUser(data, user),
+      balances: getBalancesForUser(data, user),
       resetAt: data.resetAt || 0,
     });
   }
@@ -181,6 +299,14 @@ export async function onRequest(context) {
         sendMoney(data, payload.admin, payload.to, payload.amount, payload.currency)
       );
       if (result.error) return json(result, { status: result.error === 'Admin only' ? 403 : 400 });
+      return json(result);
+    }
+
+    if (payload.action === 'tip') {
+      const result = await writeStore(kv, data =>
+        tipPlayer(data, payload.from, payload.to, payload.amount, payload.currency)
+      );
+      if (result.error) return json(result, { status: 400 });
       return json(result);
     }
 

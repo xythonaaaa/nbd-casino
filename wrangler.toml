@@ -1,30 +1,31 @@
 # NBD Casino — Cloudflare Pages + Workers KV
-# Primary deployment target (Netlify config kept in netlify.toml for reference)
+# Pages auto-deploys static files + functions/ from the repo root.
+# Do NOT run `wrangler deploy` — that is for standalone Workers only.
+# Local dev: `npm run dev:cf` (wrangler pages dev .)
 
 name = "nbd-casino"
 compatibility_date = "2024-06-01"
 pages_build_output_dir = "."
 
-# Replace placeholder IDs after creating KV namespaces in the Cloudflare dashboard.
-# Production IDs go in `id`; preview/branch deploys use `preview_id`.
-# Bindings must also be added under Pages → Settings → Functions → KV namespace bindings.
+# KV bindings for local `wrangler pages dev`.
+# Production/preview deploys also need bindings under Pages → Settings → Functions.
 
 [[kv_namespaces]]
 binding = "CHAT_KV"
-id = "00000000000000000000000000000000"
-preview_id = "00000000000000000000000000000001"
+id = "0b67e8914e404f8b8816cbef61879cbf"
+preview_id = "0b67e8914e404f8b8816cbef61879cbf"
 
 [[kv_namespaces]]
 binding = "LEADERBOARD_KV"
-id = "00000000000000000000000000000002"
-preview_id = "00000000000000000000000000000003"
+id = "5c05d5f8bc2947cc8a71bbf9dc059301"
+preview_id = "5c05d5f8bc2947cc8a71bbf9dc059301"
 
 [[kv_namespaces]]
 binding = "WALLET_KV"
-id = "00000000000000000000000000000004"
-preview_id = "00000000000000000000000000000005"
+id = "39846045b4234c01afded126eaac3e1d"
+preview_id = "39846045b4234c01afded126eaac3e1d"
 
 [[kv_namespaces]]
 binding = "AFFILIATES_KV"
-id = "00000000000000000000000000000006"
-preview_id = "00000000000000000000000000000007"
+id = "566e3b3628154cddbbaf20a516f48169"
+preview_id = "566e3b3628154cddbbaf20a516f48169"

@@ -49,7 +49,16 @@ In the Cloudflare dashboard:
 
 3. Copy each namespace **ID** (32-character hex string).
 
-4. Update `wrangler.toml` — replace the placeholder `id` and `preview_id` values with your real namespace IDs. Create separate preview namespaces (or reuse production IDs for a small site).
+4. `wrangler.toml` already contains the production namespace IDs:
+
+   | Namespace | ID |
+   |-----------|-----|
+   | nbd-chat | `0b67e8914e404f8b8816cbef61879cbf` |
+   | nbd-leaderboard | `5c05d5f8bc2947cc8a71bbf9dc059301` |
+   | nbd-wallet | `39846045b4234c01afded126eaac3e1d` |
+   | nbd-affiliates | `566e3b3628154cddbbaf20a516f48169` |
+
+   For preview/branch deploys you can create separate preview namespaces and update `preview_id`, or reuse production IDs for a small site.
 
 ---
 
@@ -57,13 +66,16 @@ In the Cloudflare dashboard:
 
 1. **Workers & Pages → Create → Pages → Connect to Git**.
 2. Select repository: `xythonaaaa/nbd-casino`.
-3. **Build settings:**
+3. **Build settings** (Settings → Builds):
 
    | Setting | Value |
    |---------|-------|
    | Production branch | `main` |
    | Build command | `npm install && npm run verify` |
    | Build output directory | `.` |
+   | **Deploy command** | **Leave empty** (do not set `npx wrangler deploy`) |
+
+   **Important:** Cloudflare **Pages** auto-deploys static files from the build output directory plus the `functions/` folder. A **Deploy command** is only for standalone **Workers** projects. If you set `npx wrangler deploy`, the build succeeds but deployment fails at the "Deploying" stage.
 
 4. Deploy once (KV bindings come next — first deploy may show API errors until bindings are set).
 
@@ -143,7 +155,9 @@ npm run dev:cf
 # http://localhost:8788
 ```
 
-Requires valid KV namespace IDs in `wrangler.toml`. Wrangler uses local KV simulation when IDs are placeholders, or remote KV when configured.
+Requires valid KV namespace IDs in `wrangler.toml`. Wrangler uses local KV simulation with placeholder IDs, or remote KV when configured.
+
+**Node.js:** Wrangler 3 (included) supports Node 18+. For Wrangler 4+, use Node 20+.
 
 ---
 
@@ -176,6 +190,7 @@ curl "https://nbdcasino.com/api/wallet?user=testuser"
 
 | Issue | Fix |
 |-------|-----|
+| Build succeeds, deploy fails at "Deploying" | Remove Deploy command in Settings → Builds (must be empty for Pages) |
 | API returns 500 / empty | Check KV bindings in Pages → Settings → Functions |
 | `Store busy, try again` | Normal under heavy concurrent writes; client should retry |
 | Static files 404 | Build output directory must be `.` (repo root) |

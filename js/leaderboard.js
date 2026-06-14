@@ -91,7 +91,7 @@ function renderLeaderboard() {
 
   const wins = window.NbdLeaderboard?.getRecentWins?.(500) || loadLeaderboardFallback().wins;
   const rows = aggregateLeaderboard(wins, activeFilter);
-  const me = (typeof getLoggedInUsername === 'function' ? getLoggedInUsername() : '').trim().toLowerCase();
+  const me = (typeof getLoggedInUsername === 'function' ? (getLoggedInUsername() || '') : '').trim().toLowerCase();
 
   if (meta) {
     const scope = activeFilter === 'originals' ? 'Originals' : 'All games';

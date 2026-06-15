@@ -354,12 +354,12 @@
 
 .cr-rocket-wrap {
   position: absolute;
-  left: 8%;
-  top: 78%;
+  left: 16px;
+  top: calc(100% - 28px);
   width: 56px;
   height: 56px;
   transform: translate(-50%, -50%) rotate(-42deg);
-  transition: left 0.05s linear, top 0.05s linear;
+  transition: left 0.05s linear, top 0.05s linear, transform 0.05s linear;
   z-index: 2;
   pointer-events: none;
 }

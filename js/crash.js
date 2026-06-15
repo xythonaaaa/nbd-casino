@@ -155,6 +155,29 @@ function resizeGraph() {
   els.graph.style.width = `${rect.width}px`;
   els.graph.style.height = `${rect.height}px`;
   drawGraph(state.multiplier, state.phase === 'flying');
+  updateRocketPosition(state.multiplier, state.phase === 'flying');
+}
+
+function getGraphLayout(w, h) {
+  const pad = { l: 16, r: 16, b: 28, t: 16 };
+  return { pad, plotW: w - pad.l - pad.r, plotH: h - pad.t - pad.b };
+}
+
+function getGraphMaxMult(currentMult, flying) {
+  return flying ? Math.max(2, currentMult * 1.15) : 2;
+}
+
+function getGraphPointAtMult(mult, currentMult, flying, w, h) {
+  const { pad, plotW, plotH } = getGraphLayout(w, h);
+  const maxMult = getGraphMaxMult(currentMult, flying);
+  if (!flying || mult <= 1) {
+    return { x: pad.l, y: pad.t + plotH };
+  }
+  const maxT = elapsedAtMult(maxMult);
+  const t = elapsedAtMult(Math.min(mult, maxMult));
+  const x = pad.l + (t / maxT) * plotW;
+  const y = pad.t + plotH - ((Math.min(mult, maxMult) - 1) / (maxMult - 1)) * plotH;
+  return { x, y };
 }
 
 function drawGraph(currentMult, flying) {
@@ -166,13 +189,8 @@ function drawGraph(currentMult, flying) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
-  const pad = { l: 16, r: 16, b: 28, t: 16 };
-  const plotW = w - pad.l - pad.r;
-  const plotH = h - pad.t - pad.b;
-
-  const maxMult = flying
-    ? Math.max(2, currentMult * 1.15)
-    : 2;
+  const { pad, plotW, plotH } = getGraphLayout(w, h);
+  const maxMult = getGraphMaxMult(currentMult, flying);
 
   ctx.strokeStyle = 'rgba(147, 51, 234, 0.12)';
   ctx.lineWidth = 1;
@@ -222,12 +240,22 @@ function drawGraph(currentMult, flying) {
   ctx.stroke();
 }
 
-function updateRocketPosition(mult, maxMult) {
-  const progress = Math.min(1, (mult - 1) / Math.max(0.01, maxMult - 1));
-  const x = 8 + progress * 72;
-  const y = 78 - progress * 58;
-  els.rocketWrap.style.left = `${x}%`;
-  els.rocketWrap.style.top = `${y}%`;
+function updateRocketPosition(mult, flying) {
+  if (!els.rocketWrap || !els.stage) return;
+  const rect = els.stage.getBoundingClientRect();
+  const w = rect.width;
+  const h = rect.height;
+  const tip = getGraphPointAtMult(mult, mult, flying, w, h);
+
+  let angle = -42;
+  if (flying && mult > 1.02) {
+    const prev = getGraphPointAtMult(Math.max(1.01, mult - 0.12), mult, flying, w, h);
+    angle = Math.atan2(tip.y - prev.y, tip.x - prev.x) * (180 / Math.PI);
+  }
+
+  els.rocketWrap.style.left = `${tip.x}px`;
+  els.rocketWrap.style.top = `${tip.y}px`;
+  els.rocketWrap.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
 }
 
 function setMultiplierDisplay(mult, type = '') {
@@ -361,7 +389,7 @@ async function launchRound(bet, currency) {
       const elapsed = (now - state.startTime) / 1000;
       state.multiplier = multAtElapsed(elapsed);
       setMultiplierDisplay(state.multiplier);
-      updateRocketPosition(state.multiplier, Math.max(state.crashPoint, 2));
+      updateRocketPosition(state.multiplier, true);
       drawGraph(state.multiplier, true);
 
       const autoTarget = getAutoCashoutTarget();
@@ -449,7 +477,7 @@ function resetRound() {
   els.stage.classList.remove('is-countdown', 'is-flying', 'is-crashed', 'is-cashed');
   setMultiplierDisplay(1);
   els.status.textContent = 'Place a bet to launch';
-  updateRocketPosition(1, 2);
+  updateRocketPosition(1, false);
   drawGraph(1, false);
   updateUI();
 }

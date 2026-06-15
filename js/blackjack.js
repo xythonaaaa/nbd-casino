@@ -137,6 +137,23 @@ function handValue(hand) {
   return total;
 }
 
+function hardHandValue(hand) {
+  return hand.reduce((sum, c) => {
+    if (c.rank === 'A') return sum + 1;
+    if (['K', 'Q', 'J'].includes(c.rank)) return sum + 10;
+    return sum + parseInt(c.rank, 10);
+  }, 0);
+}
+
+function handValueDisplay(hand) {
+  if (!hand.length) return '';
+  const soft = handValue(hand);
+  if (soft > 21) return String(soft);
+  const hard = hardHandValue(hand);
+  if (hard < soft) return `${hard}/${soft}`;
+  return String(soft);
+}
+
 function isBlackjack(hand) {
   return hand.length === 2 && handValue(hand) === 21;
 }
@@ -167,7 +184,7 @@ function clearTable() {
 function appendPlayerCard(card) {
   state.player.push(card);
   els.playerCards.appendChild(renderCard(card));
-  els.playerScore.textContent = handValue(state.player);
+  els.playerScore.textContent = handValueDisplay(state.player);
   els.rules.classList.add('hidden');
 }
 
@@ -181,7 +198,7 @@ function updateDealerScore(hideHole = false) {
   if (hideHole && state.dealer.length >= 1) {
     els.dealerScore.textContent = cardValue(state.dealer[0]);
   } else {
-    els.dealerScore.textContent = handValue(state.dealer) || '';
+    els.dealerScore.textContent = handValueDisplay(state.dealer) || '';
   }
 }
 
@@ -532,7 +549,7 @@ function finishRound(result, msg) {
   state.phase = 'idle';
   state.busy = false;
   updateDealerScore(false);
-  els.playerScore.textContent = handValue(state.player) || '';
+  els.playerScore.textContent = handValueDisplay(state.player) || '';
 
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
   const wager = state.bet;

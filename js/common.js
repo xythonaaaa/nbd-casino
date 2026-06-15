@@ -205,11 +205,21 @@ async function applyServerWalletReset(resetAt) {
   });
   saveWalletState();
   localStorage.removeItem(GRANTS_SYNC_KEY);
+  localStorage.setItem(PROFILE_STATS_KEY, JSON.stringify({ ...DEFAULT_PROFILE_STATS }));
+  localStorage.removeItem(RAKEBACK_KEY);
+  localStorage.removeItem(RANK_REWARDS_KEY);
+  localStorage.removeItem(LEADERBOARD_KEY);
+  localStorage.removeItem('nbd-gi-bets');
 
   const activeCurrency = document.querySelector('.wallet-option.active')?.dataset.currency || 'USD';
   applyWalletHeaderDisplay(activeCurrency, 0);
   saveWalletResetAck(ts);
+  leaderboardCache = { wins: [], bets: {}, recentBets: [] };
+  document.dispatchEvent(new CustomEvent('xython:stats-change', { detail: loadProfileStats() }));
+  document.dispatchEvent(new CustomEvent('xython:leaderboard-change', { detail: leaderboardCache }));
   document.dispatchEvent(new CustomEvent('xython:wallet-reset', { detail: { resetAt: ts } }));
+  renderAuthUI();
+  updateRewardsDot();
   return true;
 }
 
@@ -4361,7 +4371,7 @@ function initAdminPanelModal() {
     clearAdminPanelMessages();
 
     const confirmed = window.confirm(
-      'Reset ALL player balances to $0?\n\nThis cannot be undone and affects every registered player.'
+      'Reset ALL player balances to $0?\n\nThis also clears affiliate wager totals. Player ranks reset when they next load the site.'
     );
     if (!confirmed) return;
 
@@ -4393,13 +4403,13 @@ function initAdminPanelModal() {
     clearAdminPanelMessages();
 
     const confirmed = window.confirm(
-      'Reset Originals leaderboards?\n\nThis clears all wins, bet counts, and recent bet history.'
+      'Reset ALL leaderboards?\n\nThis clears every win, bet count, wager total, and recent bet on the site.'
     );
     if (!confirmed) return;
 
     resetLeaderboardsBtn.disabled = true;
     const result = await postLeaderboardAction({
-      action: 'reset-originals',
+      action: 'reset-all',
       admin: getLoggedInUsername(),
     });
     resetLeaderboardsBtn.disabled = false;
@@ -4411,7 +4421,10 @@ function initAdminPanelModal() {
     }
 
     await refreshLeaderboard();
-    successEl.textContent = 'Originals leaderboards cleared.';
+    localStorage.removeItem(LEADERBOARD_KEY);
+    localStorage.removeItem('nbd-gi-bets');
+    document.dispatchEvent(new CustomEvent('xython:leaderboard-change', { detail: { wins: [], bets: {}, recentBets: [] } }));
+    successEl.textContent = 'All leaderboards, wagers, and bet history cleared.';
     successEl.hidden = false;
   });
 

@@ -31,6 +31,13 @@ function resetOriginalsLeaderboard(data) {
   return data;
 }
 
+function resetAllLeaderboard(data) {
+  data.wins = [];
+  data.bets = {};
+  data.recentBets = [];
+  return data;
+}
+
 async function loadData(kv) {
   const data = (await kvGet(kv, STORE_KEY, defaultData())) || defaultData();
   return normalizeData(data);
@@ -69,6 +76,15 @@ export async function onRequest(context) {
       resetOriginalsLeaderboard(data);
       await saveData(kv, data);
       return json({ ok: true, reset: 'originals', ...data });
+    }
+
+    if (payload.action === 'reset-all') {
+      if (!isAdmin(payload.admin)) {
+        return json({ error: 'Admin only' }, 403);
+      }
+      const data = resetAllLeaderboard(await loadData(kv));
+      await saveData(kv, data);
+      return json({ ok: true, reset: 'all', ...data });
     }
 
     const game = String(payload.game || '').trim().slice(0, 32);

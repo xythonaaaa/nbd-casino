@@ -169,6 +169,28 @@ function resetAllWallets(store) {
   return { ok: true, resetAt: store.resetAt };
 }
 
+async function resetAffiliateWagers(kv) {
+  if (!kv) return;
+  try {
+    const raw = await kvGet(kv, STORE_KEY, null);
+    const data = raw && typeof raw === 'object' ? raw : {};
+    const affiliates = data.affiliates && typeof data.affiliates === 'object' ? data.affiliates : {};
+    Object.values(affiliates).forEach(affData => {
+      if (!affData || typeof affData !== 'object') return;
+      affData.referralWagered = 0;
+      if (Array.isArray(affData.referrals)) {
+        affData.referrals.forEach(ref => {
+          if (ref && typeof ref === 'object') ref.wagered = 0;
+        });
+      }
+    });
+    data.affiliates = affiliates;
+    await kvSet(kv, STORE_KEY, data);
+  } catch {
+    /* affiliate reset is best-effort */
+  }
+}
+
 function resetPlayerWallet(store, admin, username) {
   const adminName = String(admin || '').trim();
   const player = String(username || '').trim().slice(0, 16);
@@ -282,6 +304,7 @@ export async function onRequest(context) {
         return resetAllWallets(data);
       });
       if (result.error) return json(result, { status: result.error === 'Admin only' ? 403 : 400 });
+      await resetAffiliateWagers(env.AFFILIATES_KV);
       return json(result);
     }
 

@@ -12,6 +12,12 @@
 /js/common.js
   Cache-Control: public, max-age=300, must-revalidate
 
+/js/games.js
+  Cache-Control: public, max-age=300, must-revalidate
+
+/css/styles.css
+  Cache-Control: public, max-age=300, must-revalidate
+
 /js/keno.js
   Cache-Control: public, max-age=300, must-revalidate
 

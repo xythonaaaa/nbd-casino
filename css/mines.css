@@ -726,6 +726,14 @@
   opacity: 0.75;
 }
 
+.mn-grid--ended .mn-tile:not(.is-gem):not(.is-mine):not(.is-mine-other) {
+  opacity: 0.45;
+}
+
+.mn-grid--ended .mn-tile.is-mine-other {
+  opacity: 0.85;
+}
+
 .mn-tile.is-idle {
   pointer-events: none;
   background: var(--bg-card);

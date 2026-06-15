@@ -12,6 +12,7 @@ const state = {
   mineSet: new Set(),
   revealed: new Set(),
   gemsFound: 0,
+  lastHitIndex: null,
   autoPicks: new Set(),
   autoPickOrder: [],
   auto: {
@@ -93,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStats();
   });
   els.mines.addEventListener('change', () => {
+    if (state.phase === 'ended') return;
     trimAutoPicksToMax();
     syncGridView();
     updateStats();
@@ -116,7 +118,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   els.grid.addEventListener('click', handleGridClick);
 
-  document.addEventListener('xython:auth-change', updateUI);
+  document.addEventListener('xython:auth-change', () => {
+    updateUI();
+    if (state.phase === 'ended') renderBoardFromState();
+  });
 
   toggleStrategyPct('win');
   toggleStrategyPct('loss');
@@ -139,7 +144,7 @@ function handleGridClick(e) {
   }
 
   if (state.panel !== 'manual' || state.phase !== 'active') {
-    if (state.panel === 'manual' && state.phase !== 'active') {
+    if (state.panel === 'manual' && state.phase === 'idle') {
       setMessage('Place a bet first, then pick tiles on the grid', 'lose');
     }
     return;
@@ -325,20 +330,21 @@ function updateBetLabel() {
 }
 
 function updateStats() {
-  const mines = state.phase === 'active'
+  const inRound = state.phase === 'active' || state.phase === 'ended';
+  const mines = inRound
     ? state.mines
     : (parseInt(els.mines.value, 10) || 3);
 
-  const gemCount = state.phase === 'active'
+  const gemCount = inRound
     ? state.gemsFound
     : (state.panel === 'auto' ? state.autoPicks.size : 0);
 
   const mult = getMultiplier(mines, gemCount);
-  const bet = state.phase === 'active' ? state.bet : (parseFloat(els.bet.value) || 0);
+  const bet = inRound ? state.bet : (parseFloat(els.bet.value) || 0);
   const payout = bet * mult;
 
   els.multiplier.textContent = `${mult.toFixed(4)}x`;
-  els.gemsFound.textContent = String(state.phase === 'active' ? state.gemsFound : gemCount);
+  els.gemsFound.textContent = String(inRound ? state.gemsFound : gemCount);
   els.cashoutValue.textContent = `$${payout.toFixed(2)}`;
 
   const canCashout = state.phase === 'active' && state.gemsFound > 0;
@@ -373,7 +379,7 @@ function updateUI() {
 
   els.betBtn.textContent = loggedIn ? 'Place Bet' : 'Register to Bet';
   els.betBtn.hidden = active || autoIdle;
-  els.liveStats.hidden = !manual || !active;
+  els.liveStats.hidden = !manual || (!active && state.phase !== 'ended');
   els.manualPanel.hidden = !manual;
   els.autoPanel.hidden = state.panel !== 'auto';
   els.cashoutBtn.hidden = !manual || !active;
@@ -395,7 +401,7 @@ function updateUI() {
 
   els.betBtn.disabled = autoRunning;
   els.bet.disabled = active || autoRunning;
-  els.mines.disabled = active || autoRunning;
+  els.mines.disabled = active || autoRunning || state.phase === 'ended';
   els.half.disabled = active || autoRunning;
   els.doubleBet.disabled = active || autoRunning;
   els.tabManual.disabled = autoRunning || active || state.phase === 'ended';
@@ -417,11 +423,27 @@ function updateUI() {
 
   if (!autoRunning) syncAutoInfinityUI();
 
-  if (!active && !autoRunning && state.phase !== 'ended') {
-    syncGridView();
+  updateGridHint();
+}
+
+function renderBoardFromState() {
+  if (state.phase !== 'active' && state.phase !== 'ended') return;
+
+  for (let i = 0; i < GRID_SIZE; i++) {
+    if (!state.revealed.has(i)) continue;
+    if (state.mineSet.has(i)) {
+      renderMineTile(i, i === state.lastHitIndex);
+    } else {
+      renderGemTile(i);
+    }
   }
 
-  updateGridHint();
+  if (state.phase === 'ended' || state.phase === 'active') {
+    for (let i = 0; i < GRID_SIZE; i++) {
+      const tile = getTileEl(i);
+      if (tile) tile.disabled = true;
+    }
+  }
 }
 
 function getTileEl(index) {
@@ -493,6 +515,7 @@ function initRound(bet, mines, currency) {
   state.mineSet = shuffleMines(mines);
   state.revealed = new Set();
   state.gemsFound = 0;
+  state.lastHitIndex = null;
 
   enableUnrevealedTiles();
   updateStats();
@@ -564,6 +587,8 @@ function resetRound() {
   state.mineSet = new Set();
   state.revealed = new Set();
   state.gemsFound = 0;
+  state.lastHitIndex = null;
+  els.grid?.classList.remove('mn-grid--ended');
   syncGridView();
   updateStats();
   updateUI();
@@ -610,19 +635,27 @@ function cashOut(perfectBoard = false) {
 }
 
 function handleManualLoss(hitIndex) {
-  finalizeLoss(hitIndex);
-  setMessage(`Mine hit — lost $${state.bet.toFixed(2)}`, 'lose');
   state.phase = 'ended';
+  state.lastHitIndex = hitIndex;
+  finalizeLoss(hitIndex);
+  els.grid?.classList.remove('mn-grid--pick');
+  els.grid?.classList.add('mn-grid--active', 'mn-grid--ended');
+  renderBoardFromState();
+  setMessage(`Mine hit — lost $${state.bet.toFixed(2)}`, 'lose');
   updateUI();
 }
 
 function handleManualCashout(perfectBoard) {
+  state.phase = 'ended';
+  state.lastHitIndex = null;
   const result = finalizeCashout();
+  els.grid?.classList.remove('mn-grid--pick');
+  els.grid?.classList.add('mn-grid--active', 'mn-grid--ended');
+  renderBoardFromState();
   const msg = perfectBoard
     ? `Perfect board — cashed out $${result.payout.toFixed(2)} at ${result.mult.toFixed(2)}x`
     : `Cashed out $${result.payout.toFixed(2)} at ${result.mult.toFixed(2)}x`;
   setMessage(msg, 'win');
-  state.phase = 'ended';
   updateUI();
 }
 

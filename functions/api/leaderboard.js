@@ -38,6 +38,42 @@ function resetAllLeaderboard(data) {
   return data;
 }
 
+function userKey(username) {
+  return String(username || '').trim().toLowerCase();
+}
+
+function parseUserTargets(payload) {
+  const raw = [];
+  if (Array.isArray(payload.usernames)) raw.push(...payload.usernames);
+  if (payload.username) raw.push(payload.username);
+  const keys = new Set();
+  const names = [];
+  for (const name of raw) {
+    const trimmed = String(name || '').trim().slice(0, 16);
+    if (!trimmed) continue;
+    const key = userKey(trimmed);
+    if (isAdmin(trimmed)) continue;
+    if (!keys.has(key)) {
+      keys.add(key);
+      names.push(trimmed);
+    }
+  }
+  return { keys, names };
+}
+
+function removePlayersFromLeaderboard(data, keys) {
+  const removed = { wins: 0, recentBets: 0 };
+  const beforeWins = data.wins.length;
+  data.wins = data.wins.filter(w => !keys.has(userKey(w.user)));
+  removed.wins = beforeWins - data.wins.length;
+
+  const beforeBets = data.recentBets.length;
+  data.recentBets = data.recentBets.filter(b => !keys.has(userKey(b.user)));
+  removed.recentBets = beforeBets - data.recentBets.length;
+
+  return removed;
+}
+
 async function loadData(kv) {
   const data = (await kvGet(kv, STORE_KEY, defaultData())) || defaultData();
   return normalizeData(data);
@@ -85,6 +121,20 @@ export async function onRequest(context) {
       const data = resetAllLeaderboard(await loadData(kv));
       await saveData(kv, data);
       return json({ ok: true, reset: 'all', ...data });
+    }
+
+    if (payload.action === 'remove-player') {
+      if (!isAdmin(payload.admin)) {
+        return json({ error: 'Admin only' }, 403);
+      }
+      const { keys, names } = parseUserTargets(payload);
+      if (!names.length) {
+        return json({ error: 'No valid usernames' }, 400);
+      }
+      const data = await loadData(kv);
+      const removed = removePlayersFromLeaderboard(data, keys);
+      await saveData(kv, data);
+      return json({ ok: true, usernames: names, removed, ...data });
     }
 
     const game = String(payload.game || '').trim().slice(0, 32);

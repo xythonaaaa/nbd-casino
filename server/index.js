@@ -1097,6 +1097,23 @@ const server = http.createServer((req, res) => {
           return;
         }
 
+        if (payload.action === 'remove-player') {
+          if (!isWalletAdmin(payload.admin)) {
+            sendJson(res, 403, { error: 'Admin only' });
+            return;
+          }
+          const { keys, names } = parseDeletePlayerTargets(payload);
+          if (!names.length) {
+            sendJson(res, 400, { error: 'No valid usernames' });
+            return;
+          }
+          const data = loadLeaderboard();
+          const removed = removePlayersFromLeaderboardStore(data, keys);
+          saveLeaderboard(data);
+          sendJson(res, 200, { ok: true, usernames: names, removed, ...data });
+          return;
+        }
+
         const data = appendLeaderboardRound(payload);
         if (!data) {
           sendJson(res, 400, { error: 'Invalid game' });

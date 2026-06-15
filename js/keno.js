@@ -1,7 +1,7 @@
 const TOTAL_NUMBERS = 40;
 const DRAW_COUNT = 10;
 const MAX_PICKS = 10;
-const HOUSE_EDGE = 0.94;
+const HOUSE_EDGE = 0.86;
 const DRAW_DELAY_MS = 90;
 const DRAW_DELAY_FAST_MS = 25;
 const RESET_MS = 2200;
@@ -10,16 +10,16 @@ const AUTO_GAP_MS = 300;
 const HISTORY_MAX = 20;
 
 const BASE_PAYTABLE = {
-  1: [0, 3.8],
-  2: [0, 0, 13],
-  3: [0, 0, 2.2, 53],
-  4: [0, 0, 1, 8, 115],
-  5: [0, 0, 0.5, 3, 18, 230],
-  6: [0, 0, 0.5, 2, 7, 60, 580],
-  7: [0, 0, 0.5, 1, 4, 20, 150, 800],
-  8: [0, 0, 0.5, 1, 2, 8, 40, 250, 1200],
-  9: [0, 0, 0.5, 1, 2, 4, 15, 80, 400, 2000],
-  10: [0, 0, 1, 2, 3, 6, 25, 100, 500, 2000, 5000],
+  1: [0, 3.95],
+  2: [0, 0, 17],
+  3: [0, 0, 2.3, 55.5],
+  4: [0, 0, 1.25, 9.95, 145],
+  5: [0, 0, 0.78, 4.65, 28, 355],
+  6: [0, 0, 0.68, 2.7, 9.45, 81, 785],
+  7: [0, 0, 0.7, 1.4, 5.6, 28, 210, 1120],
+  8: [0, 0, 0.69, 1.4, 2.8, 11, 55.5, 345, 1670],
+  9: [0, 0, 0.61, 1.2, 2.45, 4.85, 18.5, 97.5, 485, 2430],
+  10: [0, 0, 0, 0, 3.2, 6.3, 26.5, 105, 525, 2100, 5270],
 };
 
 const state = {
@@ -458,7 +458,8 @@ async function playRound({ fast = false, silent = false } = {}) {
 
 async function placeBet() {
   if (state.auto.running || state.panel !== 'manual') return;
-  await playRound();
+  const result = await playRound();
+  if (result?.error) setMessage(result.error, 'lose');
 }
 
 async function startAuto() {

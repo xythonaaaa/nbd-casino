@@ -49,7 +49,7 @@ const GAME_INFO = {
   },
   keno: {
     name: 'Keno',
-    rtp: 95.80,
+    rtp: 85.00,
     gradient: 'linear-gradient(180deg, #34d399 0%, #059669 55%, #064e3b 100%)',
     emoji: '🔢',
     tagline: 'Pick numbers and match the draw.',

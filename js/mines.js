@@ -480,12 +480,13 @@ function validateBetAmount(bet) {
 }
 
 function initRound(bet, mines, currency) {
-  window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
+  const debitResult = window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
     type: 'bet',
     label: 'Mines',
     detail: `Bet $${bet.toFixed(2)} — ${mines} mines`,
     game: 'mines',
   });
+  if (debitResult?.ok === false) return { error: debitResult.error };
 
   state.phase = 'active';
   state.bet = bet;
@@ -583,7 +584,11 @@ async function startRound() {
   const mines = parseInt(els.mines.value, 10) || 3;
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
 
-  initRound(bet, mines, currency);
+  const round = initRound(bet, mines, currency);
+  if (round?.error) {
+    setMessage(round.error, 'lose');
+    return;
+  }
   setMessage('Pick tiles on the grid — cash out anytime after a gem', '');
 }
 
@@ -655,7 +660,8 @@ async function playAutoRound(pickOrder) {
   const mines = parseInt(els.mines.value, 10) || 3;
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
 
-  initRound(bet, mines, currency);
+  const round = initRound(bet, mines, currency);
+  if (round?.error) return round;
   els.grid?.classList.remove('mn-grid--pick');
   els.grid?.classList.add('mn-grid--active');
 

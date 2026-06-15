@@ -18,6 +18,14 @@ const WALLET_CURRENCIES = ['USD', 'BTC', 'ETH', 'LTC'];
 const MIN_TIP_USD = 0.01;
 const TIP_COOLDOWN_MS = 2000;
 const SIGNUP_BONUS_USD = 500;
+const SELF_EXCLUDE_DURATIONS = {
+  '24h': 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  '30d': 30 * 24 * 60 * 60 * 1000,
+  '6mo': 180 * 24 * 60 * 60 * 1000,
+  '1y': 365 * 24 * 60 * 60 * 1000,
+  permanent: -1,
+};
 const ORIGINALS_GAMES = new Set([
   'blackjack', 'plinko', 'roulette', 'dice', 'mines', 'crash',
   'keno', 'limbo', 'war', 'coinflip', 'hilo', 'tower', 'wheel',
@@ -415,6 +423,78 @@ function getWalletGrants(store, username) {
   return grants;
 }
 
+function ensureWalletUserMeta(store, username) {
+  const key = walletUserKey(username);
+  if (!store.userMeta) store.userMeta = {};
+  if (!store.userMeta[key]) store.userMeta[key] = { registeredAt: Date.now() };
+  return store.userMeta[key];
+}
+
+function getSelfExclusionStatus(store, username) {
+  const key = walletUserKey(username);
+  const meta = store.userMeta?.[key] || {};
+  const until = parseInt(meta.selfExcludedUntil, 10) || 0;
+  const now = Date.now();
+  if (until === -1) {
+    return {
+      active: true,
+      permanent: true,
+      selfExcludedUntil: -1,
+      selfExcludedAt: meta.selfExcludedAt || 0,
+      duration: meta.selfExcludeDuration || 'permanent',
+    };
+  }
+  if (until > now) {
+    return {
+      active: true,
+      permanent: false,
+      selfExcludedUntil: until,
+      selfExcludedAt: meta.selfExcludedAt || 0,
+      duration: meta.selfExcludeDuration || '',
+    };
+  }
+  return {
+    active: false,
+    permanent: false,
+    selfExcludedUntil: 0,
+    selfExcludedAt: 0,
+    duration: '',
+  };
+}
+
+function isWalletSelfExcluded(store, username) {
+  return getSelfExclusionStatus(store, username).active;
+}
+
+function applyWalletSelfExclusion(store, username, duration) {
+  const player = resolveWalletUser(store, username);
+  if (!player) return { error: 'Not registered' };
+
+  const durationKey = String(duration || '').trim();
+  const ms = SELF_EXCLUDE_DURATIONS[durationKey];
+  if (ms === undefined) return { error: 'Invalid duration' };
+
+  const key = walletUserKey(player);
+  const meta = ensureWalletUserMeta(store, player);
+  const now = Date.now();
+  const currentUntil = parseInt(meta.selfExcludedUntil, 10) || 0;
+
+  if (currentUntil === -1) return { error: 'Already permanently self-excluded' };
+  if (currentUntil > now && ms !== -1) {
+    meta.selfExcludedUntil = currentUntil + ms;
+  } else if (ms === -1) {
+    meta.selfExcludedUntil = -1;
+  } else {
+    meta.selfExcludedUntil = now + ms;
+  }
+
+  meta.selfExcludedAt = now;
+  meta.selfExcludeDuration = durationKey;
+
+  const status = getSelfExclusionStatus(store, player);
+  return { ok: true, username: player, ...status };
+}
+
 function sendWalletMoney(store, admin, to, amount, currency) {
   const adminName = String(admin || '').trim();
   const recipient = String(to || '').trim().slice(0, 16);
@@ -475,6 +555,7 @@ function tipWalletPlayer(store, from, to, amount, currency) {
   if (!recipient) return { error: 'Recipient not found' };
 
   if (walletUserKey(sender) === walletUserKey(recipient)) return { error: 'Cannot tip yourself' };
+  if (isWalletSelfExcluded(store, sender)) return { error: 'You are self-excluded and cannot tip' };
 
   const senderKey = walletUserKey(sender);
   if (!store.userMeta) store.userMeta = {};
@@ -779,6 +860,7 @@ function handleWalletRequest(req, res, urlPath) {
       grants: getWalletGrants(store, user),
       balances: getWalletBalances(store, user),
       resetAt: store.resetAt || 0,
+      account: getSelfExclusionStatus(store, user),
     });
     return;
   }
@@ -822,6 +904,12 @@ function handleWalletRequest(req, res, urlPath) {
           result = resetPlayerWallet(store, payload.admin, payload.username || payload.to);
           if (result.error) {
             sendJson(res, result.error === 'Admin only' ? 403 : 400, result);
+            return;
+          }
+        } else if (action === 'self-exclude') {
+          result = applyWalletSelfExclusion(store, payload.username, payload.duration);
+          if (result.error) {
+            sendJson(res, 400, result);
             return;
           }
         } else {

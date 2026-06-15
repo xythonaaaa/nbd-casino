@@ -820,12 +820,13 @@ async function startClimb({ silent = false } = {}) {
   }
 
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
-  window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
+  const debitResult = window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
     type: 'bet',
     label: 'Tower',
     detail: `$${bet.toFixed(2)} — ${getConfig().label}`,
     game: 'tower',
   });
+  if (debitResult?.ok === false) return { error: debitResult.error };
 
   state.bet = bet;
   state.difficulty = els.difficulty.value;

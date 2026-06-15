@@ -394,11 +394,12 @@ async function spin() {
   setMessage('');
   updateUI();
 
-  window.XythonWallet?.setBalance(currency, balance - bet, {
+  const debitResult = window.XythonWallet?.setBalance(currency, balance - bet, {
     type: 'bet',
     game: 'Wheel',
     amount: bet,
   });
+  if (debitResult?.ok === false) return;
 
   const winIndex = pickSliceIndex();
   const slice = getSlices()[winIndex];

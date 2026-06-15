@@ -311,16 +311,18 @@ async function startRound() {
   }
 
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
-  await launchRound(bet, currency);
+  const round = await launchRound(bet, currency);
+  if (round?.error) setMessage(round.error, 'lose');
 }
 
 async function launchRound(bet, currency) {
-  window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
+  const debitResult = window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
     type: 'bet',
     label: 'Crash',
     detail: `Bet $${bet.toFixed(2)}`,
     game: 'crash',
   });
+  if (debitResult?.ok === false) return { error: debitResult.error };
 
   state.phase = 'countdown';
   state.bet = bet;

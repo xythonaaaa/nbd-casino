@@ -426,3 +426,134 @@
     align-items: flex-start;
   }
 }
+
+.self-exclusion-banner {
+  padding: 10px 16px;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fecaca;
+  background: rgba(220, 38, 38, 0.15);
+  border-bottom: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+.security-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.security-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.security-field-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.security-input {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.security-input:focus {
+  outline: none;
+  border-color: rgba(147, 51, 234, 0.45);
+}
+
+.security-note {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.security-link {
+  color: var(--accent-light);
+  font-weight: 600;
+}
+
+.security-message {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.security-message.is-error {
+  color: #f87171;
+}
+
+.security-message.is-success {
+  color: #4ade80;
+}
+
+.exclusion-status {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: rgba(220, 38, 38, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  color: #fecaca;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.exclusion-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.exclusion-option {
+  display: block;
+}
+
+.exclusion-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.exclusion-option-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.exclusion-option input:checked + .exclusion-option-box {
+  border-color: rgba(147, 51, 234, 0.45);
+  background: rgba(147, 51, 234, 0.12);
+}
+
+.exclusion-option-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.exclusion-option-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.exclusion-confirm {
+  margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+  .exclusion-options {
+    grid-template-columns: 1fr;
+  }
+}

@@ -304,12 +304,13 @@ async function playRound({ fast = false, silent = false } = {}) {
 
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
 
-  window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
+  const debitResult = window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
     type: 'bet',
     label: 'Limbo',
     detail: `Bet $${bet.toFixed(2)} @ ${target.toFixed(2)}x`,
     game: 'limbo',
   });
+  if (debitResult?.ok === false) return { error: debitResult.error };
 
   state.phase = 'rolling';
   hideResultPopup();

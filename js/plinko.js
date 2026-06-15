@@ -511,12 +511,13 @@ function placeBet() {
     rebuildBoard();
   }
 
-  window.XythonWallet?.setBalance(currency, balance - bet, {
+  const debitResult = window.XythonWallet?.setBalance(currency, balance - bet, {
     type: 'bet',
     label: 'Plinko',
     detail: `Bet $${bet.toFixed(2)}`,
     game: 'plinko',
   });
+  if (debitResult?.ok === false) return;
   dropBall(bet, currency);
   updateUI();
 }

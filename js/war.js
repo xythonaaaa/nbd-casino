@@ -353,12 +353,13 @@ function validateBet(bet, tieBet) {
 function deductBet(amount, detail) {
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
   const balance = window.XythonWallet?.getBalance(currency) ?? 0;
-  window.XythonWallet?.setBalance(currency, balance - amount, {
+  const debitResult = window.XythonWallet?.setBalance(currency, balance - amount, {
     type: 'bet',
     label: 'Surrender or War',
     detail,
     game: 'war',
   });
+  return debitResult?.ok === false ? debitResult.error : null;
 }
 
 function creditWin(amount, detail) {
@@ -409,7 +410,14 @@ async function startRound({ fast = false, autoSurrender = false } = {}) {
   showTable(true);
   updateUI();
 
-  deductBet(bet + tieBet, `Bet $${bet.toFixed(2)}${tieBet > 0 ? ` + tie $${tieBet.toFixed(2)}` : ''}`);
+  const betError = deductBet(bet + tieBet, `Bet $${bet.toFixed(2)}${tieBet > 0 ? ` + tie $${tieBet.toFixed(2)}` : ''}`);
+  if (betError) {
+    state.busy = false;
+    state.phase = 'idle';
+    setMessage(betError, 'lose');
+    updateUI();
+    return;
+  }
 
   await wait(fast ? 180 : DEAL_MS);
   state.playerCard = drawCard();
@@ -498,7 +506,15 @@ async function doWar({ fast = false } = {}) {
   setMessage('');
   updateUI();
 
-  deductBet(state.bet, `War bet $${state.bet.toFixed(2)}`);
+  const betError = deductBet(state.bet, `War bet $${state.bet.toFixed(2)}`);
+  if (betError) {
+    state.busy = false;
+    state.atWar = false;
+    state.phase = 'choice';
+    setMessage(betError, 'lose');
+    updateUI();
+    return;
+  }
 
   await wait(fast ? 180 : DEAL_MS);
   for (let i = 0; i < 3; i++) drawCard();

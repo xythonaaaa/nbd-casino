@@ -388,12 +388,16 @@ async function placeBet() {
     return;
   }
 
-  window.XythonWallet?.setBalance(currency, balance - totalWager, {
+  const debitResult = window.XythonWallet?.setBalance(currency, balance - totalWager, {
     type: 'bet',
     label: 'Blackjack',
     detail: `Bet $${totalWager.toFixed(2)}`,
     game: 'blackjack',
   });
+  if (debitResult?.ok === false) {
+    setMessage(debitResult.error, 'lose');
+    return;
+  }
 
   state.bet = bet;
   state.sideBets = sideBets;
@@ -474,12 +478,16 @@ async function doubleDown() {
 
   state.busy = true;
   updateUI();
-  window.XythonWallet?.setBalance(currency, balance - state.bet, {
+  const debitResult = window.XythonWallet?.setBalance(currency, balance - state.bet, {
     type: 'bet',
     label: 'Blackjack',
     detail: `Double down — $${state.bet.toFixed(2)}`,
     game: 'blackjack',
   });
+  if (debitResult?.ok === false) {
+    setMessage(debitResult.error, 'lose');
+    return;
+  }
   state.bet *= 2;
   state.doubled = true;
 

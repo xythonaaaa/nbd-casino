@@ -391,12 +391,17 @@ function spin() {
     return;
   }
 
-  window.XythonWallet?.setBalance(currency, balance - total, {
+  const debitResult = window.XythonWallet?.setBalance(currency, balance - total, {
     type: 'bet',
     label: 'Roulette',
-    detail: `Bet $${total.toFixed(2)}`,
+    detail: `$${total.toFixed(2)}`,
     game: 'roulette',
   });
+  if (debitResult?.ok === false) {
+    state.locked = false;
+    updateUI();
+    return;
+  }
 
   state.lastRound = {
     bets: { ...state.bets },

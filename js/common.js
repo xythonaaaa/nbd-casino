@@ -31,6 +31,7 @@ const WALLET_GRANTS_POLL_MS = 8000;
 const WALLET_CURRENCIES = ['USD', 'BTC', 'ETH', 'LTC'];
 
 let walletGrantsPollTimer = null;
+let cachedAccountStatus = null;
 
 function getWalletApiUrl() {
   if (window.NBD_WALLET_API) return window.NBD_WALLET_API;
@@ -151,12 +152,158 @@ async function fetchServerGrants(username) {
     const data = await res.json();
     if (data.resetAt) await applyServerWalletReset(data.resetAt);
     if (!data.grants || typeof data.grants !== 'object') return null;
+    if (data.account) applyAccountStatus(data.account);
     return {
       grants: data.grants,
       balances: data.balances && typeof data.balances === 'object' ? data.balances : {},
+      account: data.account || null,
     };
   } catch {
     return null;
+  }
+}
+
+function applyAccountStatus(status) {
+  cachedAccountStatus = status && typeof status === 'object' ? { ...status } : null;
+  document.body?.classList.toggle('is-self-excluded', !!cachedAccountStatus?.active);
+  renderSelfExclusionBanner();
+  document.dispatchEvent(new CustomEvent('xython:account-status', { detail: cachedAccountStatus }));
+}
+
+function getAccountStatus() {
+  return cachedAccountStatus ? { ...cachedAccountStatus } : null;
+}
+
+function isSelfExcluded() {
+  const status = cachedAccountStatus;
+  if (!status?.active) return false;
+  if (status.permanent || status.selfExcludedUntil === -1) return true;
+  return (parseInt(status.selfExcludedUntil, 10) || 0) > Date.now();
+}
+
+function getBetBlockReason() {
+  if (!isLoggedIn()) return 'Log in to place bets';
+  if (isSelfExcluded()) {
+    const end = formatSelfExclusionEnd();
+    return end
+      ? `You are self-excluded until ${end} and cannot place bets.`
+      : 'You are permanently self-excluded and cannot place bets.';
+  }
+  return null;
+}
+
+function formatSelfExclusionEnd() {
+  const status = cachedAccountStatus;
+  if (!status?.active) return '';
+  if (status.permanent || status.selfExcludedUntil === -1) return '';
+  const until = parseInt(status.selfExcludedUntil, 10) || 0;
+  if (!until || until <= Date.now()) return '';
+  return new Date(until).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
+async function requestSelfExclusion(duration) {
+  const username = getLoggedInUsername();
+  if (!username) return { ok: false, error: 'Log in to continue' };
+  const result = await postWalletAction({
+    action: 'self-exclude',
+    username,
+    duration,
+  });
+  if (!result?.ok) {
+    return { ok: false, error: result?.data?.error || 'Could not apply self-exclusion' };
+  }
+  applyAccountStatus(result.data);
+  return { ok: true, status: getAccountStatus() };
+}
+
+async function changeAccountPassword(currentPassword, newPassword) {
+  const username = getLoggedInUsername();
+  if (!username) return { ok: false, error: 'Log in to continue' };
+  if (!canUsePasswordCrypto()) {
+    return { ok: false, error: 'Password changes require a secure connection (HTTPS)' };
+  }
+  if (!hasAccount(username)) {
+    return { ok: false, error: 'No password is set for this account on this device' };
+  }
+
+  const valid = await verifyAccountPassword(username, currentPassword);
+  if (!valid) return { ok: false, error: 'Current password is incorrect' };
+
+  const passwordError = validatePassword(newPassword);
+  if (passwordError) return { ok: false, error: passwordError };
+
+  const creds = await createPasswordCredentials(newPassword);
+  const accounts = loadAccounts();
+  const key = username.toLowerCase();
+  accounts[key] = {
+    ...accounts[key],
+    hash: creds.hash,
+    salt: creds.salt,
+  };
+  saveAccounts(accounts);
+  return { ok: true };
+}
+
+function renderSelfExclusionBanner() {
+  let banner = document.getElementById('selfExclusionBanner');
+  if (!isSelfExcluded()) {
+    banner?.remove();
+    return;
+  }
+
+  const end = formatSelfExclusionEnd();
+  const message = end
+    ? `Self-exclusion active — betting is disabled until ${end}.`
+    : 'Permanent self-exclusion active — betting is disabled on this account.';
+
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'selfExclusionBanner';
+    banner.className = 'self-exclusion-banner';
+    const header = document.querySelector('.top-header');
+    if (header) header.insertAdjacentElement('afterend', banner);
+    else document.body.prepend(banner);
+  }
+  banner.textContent = message;
+}
+
+function accountNavIcon(name) {
+  const icons = {
+    shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',
+  };
+  const path = icons[name] || icons.shield;
+  return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${path}</svg>`;
+}
+
+function createAccountNavLink(href, page, label, icon) {
+  const link = document.createElement('a');
+  link.href = sitePath(href);
+  link.className = 'account-nav-item';
+  if (document.body.dataset.page === page) link.classList.add('active');
+  link.innerHTML = `${accountNavIcon(icon)} ${label}`;
+  return link;
+}
+
+function enhanceAccountNav() {
+  const nav = document.querySelector('.account-nav-list');
+  if (!nav || nav.dataset.enhanced) return;
+  nav.dataset.enhanced = '1';
+
+  nav.querySelectorAll('a.account-nav-item[href="#"]').forEach(link => {
+    const text = link.textContent.trim();
+    if (text === 'Security') link.href = sitePath('security.html');
+    if (text === 'Self Exclusion') link.href = sitePath('self-exclusion.html');
+  });
+
+  if (!nav.querySelector('a[href*="security.html"]')) {
+    nav.appendChild(createAccountNavLink('security.html', 'security', 'Security', 'shield'));
+  }
+  if (!nav.querySelector('a[href*="self-exclusion.html"]')) {
+    nav.appendChild(createAccountNavLink('self-exclusion.html', 'self-exclusion', 'Self Exclusion', 'lock'));
   }
 }
 
@@ -3031,7 +3178,8 @@ function handleUserMenuAction(menu) {
       window.openLiveChat?.();
       return;
     case 'self-exclusion':
-      window.alert('Self exclusion is not enabled on this site.');
+      if (!requireAuth('login')) return;
+      window.location.href = sitePath('self-exclusion.html');
       return;
     case 'redeem':
       window.alert('Redeem codes are not available yet.');
@@ -3432,6 +3580,12 @@ function resetAccountProgress() {
 
 window.XythonAccount = {
   reset: resetAccountProgress,
+  getStatus: getAccountStatus,
+  isSelfExcluded,
+  getBetBlockReason,
+  formatSelfExclusionEnd,
+  requestSelfExclusion,
+  changePassword: changeAccountPassword,
 };
 
 function loadWalletState() {
@@ -3735,12 +3889,33 @@ window.XythonWallet = {
   getBalance(currency) {
     return getWalletBalance(currency || this.getActiveCurrency());
   },
+  debitBet(currency, bet, tx) {
+    const block = getBetBlockReason();
+    if (block) {
+      showToast(block, 'error');
+      return { ok: false, error: block };
+    }
+    const amt = parseFloat(bet);
+    if (!amt || amt <= 0) return { ok: false, error: 'Invalid bet amount' };
+    const cur = currency || this.getActiveCurrency();
+    const balance = this.getBalance(cur);
+    if (balance < amt) return { ok: false, error: 'Insufficient balance' };
+    this.setBalance(cur, balance - amt, { ...tx, type: 'bet' });
+    return { ok: true };
+  },
   setBalance(currency, value, tx) {
     const cur = currency || this.getActiveCurrency();
     const previous = getWalletBalance(cur);
+    const delta = value - previous;
+    if (delta < 0 && tx?.type === 'bet') {
+      const block = getBetBlockReason();
+      if (block) {
+        showToast(block, 'error');
+        return { ok: false, error: block };
+      }
+    }
     setWalletBalance(cur, value);
     if (tx) {
-      const delta = value - previous;
       if (delta !== 0) {
         recordTransaction({
           type: tx.type,
@@ -3752,6 +3927,7 @@ window.XythonWallet = {
         });
       }
     }
+    return { ok: true };
   },
   formatAmount(currency, value) {
     return formatWalletDisplay(currency || this.getActiveCurrency(), value);
@@ -4708,6 +4884,8 @@ function initCommon() {
   initLiveBets();
   initCasinoThemeLoader();
   initGameInfoLoader();
+  enhanceAccountNav();
+  renderSelfExclusionBanner();
 }
 
 function initGameInfoLoader() {

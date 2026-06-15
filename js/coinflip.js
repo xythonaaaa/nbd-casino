@@ -288,12 +288,13 @@ async function flipCoin({ silent = false, fast = false } = {}) {
   updateUI();
   hidePopup();
 
-  window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
+  const debitResult = window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
     type: 'bet',
     label: 'Coinflip',
     detail: `$${bet.toFixed(2)} on ${sideLabel(pick)}`,
     game: 'coinflip',
   });
+  if (debitResult?.ok === false) return { error: debitResult.error };
 
   if (!silent) {
     setMessage('');

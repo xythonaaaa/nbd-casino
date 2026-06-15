@@ -7,6 +7,14 @@ const VALID_CURRENCIES = ['USD', 'BTC', 'ETH', 'LTC'];
 const MIN_TIP_USD = 0.01;
 const TIP_COOLDOWN_MS = 2000;
 const SIGNUP_BONUS_USD = 500;
+const SELF_EXCLUDE_DURATIONS = {
+  '24h': 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  '30d': 30 * 24 * 60 * 60 * 1000,
+  '6mo': 180 * 24 * 60 * 60 * 1000,
+  '1y': 365 * 24 * 60 * 60 * 1000,
+  permanent: -1,
+};
 
 function defaultBalances() {
   return { USD: 0, BTC: 0, ETH: 0, LTC: 0 };
@@ -142,6 +150,78 @@ function getGrantsForUser(store, username) {
   return grants;
 }
 
+function ensureUserMeta(store, username) {
+  const key = userKey(username);
+  if (!store.userMeta) store.userMeta = {};
+  if (!store.userMeta[key]) store.userMeta[key] = { registeredAt: Date.now() };
+  return store.userMeta[key];
+}
+
+function getSelfExclusionStatus(store, username) {
+  const key = userKey(username);
+  const meta = store.userMeta?.[key] || {};
+  const until = parseInt(meta.selfExcludedUntil, 10) || 0;
+  const now = Date.now();
+  if (until === -1) {
+    return {
+      active: true,
+      permanent: true,
+      selfExcludedUntil: -1,
+      selfExcludedAt: meta.selfExcludedAt || 0,
+      duration: meta.selfExcludeDuration || 'permanent',
+    };
+  }
+  if (until > now) {
+    return {
+      active: true,
+      permanent: false,
+      selfExcludedUntil: until,
+      selfExcludedAt: meta.selfExcludedAt || 0,
+      duration: meta.selfExcludeDuration || '',
+    };
+  }
+  return {
+    active: false,
+    permanent: false,
+    selfExcludedUntil: 0,
+    selfExcludedAt: 0,
+    duration: '',
+  };
+}
+
+function isSelfExcluded(store, username) {
+  return getSelfExclusionStatus(store, username).active;
+}
+
+function applySelfExclusion(store, username, duration) {
+  const player = resolveWalletUser(store, username);
+  if (!player) return { error: 'Not registered' };
+
+  const durationKey = String(duration || '').trim();
+  const ms = SELF_EXCLUDE_DURATIONS[durationKey];
+  if (ms === undefined) return { error: 'Invalid duration' };
+
+  const key = userKey(player);
+  const meta = ensureUserMeta(store, player);
+  const now = Date.now();
+  const currentUntil = parseInt(meta.selfExcludedUntil, 10) || 0;
+
+  if (currentUntil === -1) return { error: 'Already permanently self-excluded' };
+  if (currentUntil > now && ms !== -1) {
+    meta.selfExcludedUntil = currentUntil + ms;
+  } else if (ms === -1) {
+    meta.selfExcludedUntil = -1;
+  } else {
+    meta.selfExcludedUntil = now + ms;
+  }
+
+  meta.selfExcludedAt = now;
+  meta.selfExcludeDuration = durationKey;
+
+  const status = getSelfExclusionStatus(store, player);
+  return { ok: true, username: player, ...status };
+}
+
 function sendMoney(store, admin, to, amount, currency) {
   const adminName = String(admin || '').trim();
   const recipient = String(to || '').trim().slice(0, 16);
@@ -231,6 +311,7 @@ function tipPlayer(store, from, to, amount, currency) {
   if (!recipient) return { error: 'Recipient not found' };
 
   if (userKey(sender) === userKey(recipient)) return { error: 'Cannot tip yourself' };
+  if (isSelfExcluded(store, sender)) return { error: 'You are self-excluded and cannot tip' };
 
   const senderKey = userKey(sender);
   if (!store.userMeta) store.userMeta = {};
@@ -281,6 +362,7 @@ export async function onRequest(context) {
       grants: getGrantsForUser(data, user),
       balances: getBalancesForUser(data, user),
       resetAt: data.resetAt || 0,
+      account: getSelfExclusionStatus(data, user),
     });
   }
 
@@ -328,6 +410,14 @@ export async function onRequest(context) {
     if (payload.action === 'tip') {
       const result = await writeStore(kv, data =>
         tipPlayer(data, payload.from, payload.to, payload.amount, payload.currency)
+      );
+      if (result.error) return json(result, { status: 400 });
+      return json(result);
+    }
+
+    if (payload.action === 'self-exclude') {
+      const result = await writeStore(kv, data =>
+        applySelfExclusion(data, payload.username, payload.duration)
       );
       if (result.error) return json(result, { status: 400 });
       return json(result);

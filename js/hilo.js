@@ -279,12 +279,16 @@ async function startRound() {
   }
 
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
-  window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
+  const debitResult = window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
     type: 'bet',
     label: 'Hi-Lo',
     detail: `$${bet.toFixed(2)}`,
     game: 'hilo',
   });
+  if (debitResult?.ok === false) {
+    setMessage(debitResult.error, 'lose');
+    return;
+  }
 
   state.bet = bet;
   state.current = randomCard();

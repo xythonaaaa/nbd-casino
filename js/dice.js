@@ -310,12 +310,13 @@ async function executeRoll(options = {}) {
   const mult = getMultiplier(state.mode, state.target);
   const balance = window.XythonWallet?.getBalance(currency) ?? 0;
 
-  window.XythonWallet?.setBalance(currency, balance - bet, {
+  const debitResult = window.XythonWallet?.setBalance(currency, balance - bet, {
     type: 'bet',
     label: 'Dice',
     detail: `Bet $${bet.toFixed(2)}`,
     game: 'dice',
   });
+  if (debitResult?.ok === false) return { error: debitResult.error };
 
   const roll = rollValue();
   const won = isWin(roll, state.mode, state.target);

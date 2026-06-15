@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <title>Self Exclusion | NBD Casino</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/settings.css">
+</head>
+<body data-page="self-exclusion">
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="logo">
+          <span class="logo-text">NBD Casino</span>
+        </a>
+        <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item" data-nav="casino">Casino</a>
+        <a href="originals.html" class="nav-item" data-nav="originals">Originals</a>
+        <a href="leaderboard.html" class="nav-item" data-nav="leaderboard">Leaderboard</a>
+      </nav>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="top-header">
+        <div class="header-start">
+          <button class="hamburger" id="hamburger" aria-label="Open menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          </button>
+          <a href="index.html" class="header-brand">
+            <span class="header-brand-text">NBD Casino</span>
+          </a>
+        </div>
+        <div class="header-center">
+          <div class="header-wallet">
+            <button class="wallet-balance" id="walletBalance" type="button" aria-haspopup="true" aria-expanded="false">
+              <span class="wallet-currency-icon">$</span>
+              <span class="wallet-amount" id="walletAmount">0.00</span>
+            </button>
+            <button class="wallet-deposit" id="walletDeposit" type="button">Deposit</button>
+            <div class="wallet-dropdown" id="walletDropdown" hidden>
+              <button type="button" class="wallet-option active" data-currency="USD" data-amount="0.00">USD — $0.00</button>
+              <button type="button" class="wallet-option" data-currency="BTC" data-amount="0.00000000">BTC — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="ETH" data-amount="0.00000000">ETH — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="LTC" data-amount="0.00000000">LTC — 0.00000000</button>
+            </div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost">Log In</button>
+          <button class="btn btn-primary">Register</button>
+        </div>
+      </header>
+
+      <div class="settings-layout">
+        <aside class="account-nav">
+          <h2 class="account-nav-title">Account</h2>
+          <nav class="account-nav-list">
+            <a href="profile.html" class="account-nav-item">Profile</a>
+            <a href="settings.html" class="account-nav-item">Settings</a>
+            <a href="transactions.html" class="account-nav-item">Transactions</a>
+            <a href="vip.html" class="account-nav-item">VIP</a>
+            <a href="affiliates.html" class="account-nav-item">Affiliates</a>
+            <a href="security.html" class="account-nav-item">Security</a>
+            <a href="self-exclusion.html" class="account-nav-item active">Self Exclusion</a>
+          </nav>
+        </aside>
+
+        <main class="settings-main">
+          <div class="settings-page-head">
+            <h1 class="settings-page-title">Self Exclusion</h1>
+            <p class="settings-page-sub">Block betting on your account for a cooling-off period</p>
+          </div>
+
+          <div class="settings-stack">
+            <div class="exclusion-status" id="exclusionStatus" hidden></div>
+
+            <section class="settings-panel settings-panel--danger" id="exclusionFormPanel">
+              <div class="settings-panel-head">
+                <span class="settings-panel-icon settings-panel-icon--danger">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </span>
+                <div>
+                  <h2 class="settings-panel-title">Choose exclusion period</h2>
+                  <p class="settings-panel-desc">You will not be able to place bets or send tips until the period ends</p>
+                </div>
+              </div>
+
+              <div class="exclusion-options" id="exclusionOptions">
+                <label class="exclusion-option">
+                  <input type="radio" name="exclusionDuration" value="24h" checked>
+                  <span class="exclusion-option-box">
+                    <span class="exclusion-option-title">24 hours</span>
+                    <span class="exclusion-option-desc">Short cooling-off break</span>
+                  </span>
+                </label>
+                <label class="exclusion-option">
+                  <input type="radio" name="exclusionDuration" value="7d">
+                  <span class="exclusion-option-box">
+                    <span class="exclusion-option-title">7 days</span>
+                    <span class="exclusion-option-desc">One week away from betting</span>
+                  </span>
+                </label>
+                <label class="exclusion-option">
+                  <input type="radio" name="exclusionDuration" value="30d">
+                  <span class="exclusion-option-box">
+                    <span class="exclusion-option-title">30 days</span>
+                    <span class="exclusion-option-desc">One month exclusion</span>
+                  </span>
+                </label>
+                <label class="exclusion-option">
+                  <input type="radio" name="exclusionDuration" value="6mo">
+                  <span class="exclusion-option-box">
+                    <span class="exclusion-option-title">6 months</span>
+                    <span class="exclusion-option-desc">Extended break</span>
+                  </span>
+                </label>
+                <label class="exclusion-option">
+                  <input type="radio" name="exclusionDuration" value="1y">
+                  <span class="exclusion-option-box">
+                    <span class="exclusion-option-title">1 year</span>
+                    <span class="exclusion-option-desc">Long-term exclusion</span>
+                  </span>
+                </label>
+                <label class="exclusion-option">
+                  <input type="radio" name="exclusionDuration" value="permanent">
+                  <span class="exclusion-option-box">
+                    <span class="exclusion-option-title">Permanent</span>
+                    <span class="exclusion-option-desc">Cannot be reversed by you</span>
+                  </span>
+                </label>
+              </div>
+
+              <div class="exclusion-confirm">
+                <label class="security-field">
+                  <span class="security-field-label">Type your username to confirm</span>
+                  <input type="text" id="exclusionConfirmUser" class="security-input" maxlength="16" autocomplete="off" placeholder="Your username">
+                </label>
+                <p class="security-note">Self-exclusion applies immediately and is stored on your account. Contact support if you need help.</p>
+                <p class="security-message" id="exclusionMessage" hidden></p>
+                <button type="button" class="settings-action-btn settings-action-btn--danger" id="exclusionSubmit">Activate Self Exclusion</button>
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/self-exclusion.js"></script>
+</body>
+</html>

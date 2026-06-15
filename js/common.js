@@ -2664,6 +2664,7 @@ function renderAuthUI() {
               ${userMenuItem('rewards', 'Rewards', userMenuIcon('rewards'))}
               ${userMenuItem('affiliates', 'Affiliates', userMenuIcon('affiliates'))}
               ${userMenuItem('vault', 'Vault', userMenuIcon('vault'))}
+              ${userMenuItem('security', 'Security', userMenuIcon('security'))}
               ${userMenuItem('self-exclusion', 'Self Exclusion', userMenuIcon('lock'))}
               ${userMenuItem('support', 'Live Chat', userMenuIcon('support'))}
               ${userMenuItem('redeem', 'Redeem Code', userMenuIcon('redeem'))}
@@ -2707,6 +2708,7 @@ function userMenuIcon(type) {
     rewards: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8V21M12 8c-2-3-6-3-6 0h6zM12 8c2-3 6-3 6 0h-6zM12 8V5"/></svg>',
     affiliates: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M7.5 7.5L10.5 16M16.5 7.5L13.5 16M8 6h8"/></svg>',
     vault: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M12 9v3l2 1"/></svg>',
+    security: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
     lock: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>',
     support: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11a9 9 0 0118 0v4a2 2 0 01-2 2h-1v-5H6v5H5a2 2 0 01-2-2v-4z"/><path d="M8 21h8"/></svg>',
     redeem: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a2 2 0 012-2h16a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2V9zM2 13h20v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"/><path d="M12 9v10"/></svg>',
@@ -3170,6 +3172,10 @@ function handleUserMenuAction(menu) {
     case 'vault':
       if (!requireAuth('register')) return;
       window.openVaultModal?.();
+      return;
+    case 'security':
+      if (!requireAuth('login')) return;
+      window.location.href = sitePath('security.html');
       return;
     case 'rewards':
       openRewardsPopout();

@@ -1,6 +1,7 @@
 const GAMES = {
   originals: [
     { name: 'Blackjack', cover: 'blackjack', gradient: 'linear-gradient(180deg, #9b6dff 0%, #5b21b6 55%, #3b0764 100%)', badge: 'hot', href: 'blackjack.html' },
+    { name: 'Double Down Blackjack', cover: 'double-down-blackjack', gradient: 'linear-gradient(180deg, #fcd34d 0%, #d97706 55%, #78350f 100%)', badge: 'new', href: 'double-down-blackjack.html' },
     { name: 'Plinko', cover: 'plinko', gradient: 'linear-gradient(180deg, #fcd34d 0%, #d97706 55%, #92400e 100%)', badge: 'hot', href: 'plinko.html' },
     { name: 'Roulette', cover: 'roulette', gradient: 'linear-gradient(180deg, #60a5fa 0%, #2563eb 55%, #1e3a8a 100%)', href: 'roulette.html' },
     { name: 'Dice', cover: 'dice', gradient: 'linear-gradient(180deg, #fb923c 0%, #ea580c 55%, #431407 100%)', href: 'dice.html' },
@@ -83,6 +84,32 @@ function rouletteCoverHTML(game) {
       <div class="rl-cover-footer">
         <span class="rl-cover-title">${game.name}</span>
         <span class="rl-cover-brand">NBD Originals</span>
+      </div>
+    </div>
+  `;
+}
+
+function doubleDownBlackjackCoverHTML(game) {
+  return `
+    ${game.badge ? `<span class="game-card-badge ${game.badge}">${game.badge}</span>` : ''}
+    <div class="ddb-cover">
+      <div class="ddb-cover-scene">
+        <div class="ddb-cover-glow"></div>
+        <div class="ddb-cover-cards">
+          <div class="ddb-cover-card ddb-cover-card--left">
+            <span class="ddb-cc-corner red"><span class="ddb-cc-rank">10</span><span class="ddb-cc-suit">♥</span></span>
+            <span class="ddb-cc-suit-center red">♥</span>
+          </div>
+          <div class="ddb-cover-card ddb-cover-card--right">
+            <span class="ddb-cc-corner"><span class="ddb-cc-rank">A</span><span class="ddb-cc-suit">♠</span></span>
+            <span class="ddb-cc-suit-center">♠</span>
+          </div>
+          <div class="ddb-cover-badge">2×</div>
+        </div>
+      </div>
+      <div class="ddb-cover-footer">
+        <span class="ddb-cover-title">${game.name}</span>
+        <span class="ddb-cover-brand">NBD Originals</span>
       </div>
     </div>
   `;
@@ -371,6 +398,8 @@ function createGameCard(game) {
 
   if (game.cover === 'blackjack') {
     card.innerHTML = blackjackCoverHTML(game);
+  } else if (game.cover === 'double-down-blackjack') {
+    card.innerHTML = doubleDownBlackjackCoverHTML(game);
   } else if (game.cover === 'plinko') {
     card.innerHTML = plinkoCoverHTML(game);
   } else if (game.cover === 'roulette') {

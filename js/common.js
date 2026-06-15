@@ -550,7 +550,8 @@ function initSidebar() {
 }
 
 const GAME_ID_NAMES = {
-  blackjack: 'Blackjack', plinko: 'Plinko', roulette: 'Roulette', dice: 'Dice',
+  blackjack: 'Blackjack', 'double-down-blackjack': 'Double Down Blackjack',
+  plinko: 'Plinko', roulette: 'Roulette', dice: 'Dice',
   mines: 'Mines', crash: 'Crash', keno: 'Keno', limbo: 'Limbo', war: 'War',
   coinflip: 'Coinflip', hilo: 'Hi-Lo', tower: 'Tower', wheel: 'Wheel',
 };

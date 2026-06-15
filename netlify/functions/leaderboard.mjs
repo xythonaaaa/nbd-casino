@@ -5,7 +5,7 @@ const MAX_RECENT_BETS = 100;
 const STORE_KEY = 'data';
 const ADMIN_USERNAMES = ['ceo'];
 const ORIGINALS_GAMES = new Set([
-  'blackjack', 'plinko', 'roulette', 'dice', 'mines', 'crash',
+  'blackjack', 'double-down-blackjack', 'plinko', 'roulette', 'dice', 'mines', 'crash',
   'keno', 'limbo', 'war', 'coinflip', 'hilo', 'tower', 'wheel',
 ]);
 

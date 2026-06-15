@@ -7,6 +7,14 @@ const GAME_INFO = {
     tagline: 'Classic 21 with 3:2 blackjack payouts and optional side bets.',
     description: 'Play NBD Blackjack with standard rules — dealer stands on 17, blackjack pays 3:2, and insurance pays 2:1. Optional Perfect Pairs and 21+3 side bets add extra ways to win on every deal.',
   },
+  'double-down-blackjack': {
+    name: 'Double Down Blackjack',
+    rtp: 98.50,
+    gradient: 'linear-gradient(180deg, #fcd34d 0%, #d97706 55%, #78350f 100%)',
+    emoji: '🃏',
+    tagline: 'Aggressive doubles, hit after double, dealer 22 pushes.',
+    description: 'A high-action blackjack variant — double your bet and keep hitting, dealer stands on 17, blackjack pays 3:2, and if the dealer totals exactly 22, all non-busted hands push.',
+  },
   plinko: {
     name: 'Plinko',
     rtp: 97.00,

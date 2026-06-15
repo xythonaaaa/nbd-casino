@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <title>Double Down Blackjack | NBD Casino</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/blackjack.css">
+  <link rel="stylesheet" href="/css/dd-blackjack.css">
+</head>
+<body class="ddb-page" data-page="originals">
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="logo">
+          <svg class="logo-icon" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <rect x="2" y="2" width="28" height="28" rx="6.5" fill="url(#logoGrad)"/>
+            <text x="16" y="20" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700" fill="url(#logoTextGrad)" letter-spacing="-0.1">NBD</text>
+            <defs>
+              <linearGradient id="logoGrad" x1="2" y1="2" x2="30" y2="30">
+                <stop stop-color="#7c3aed"/>
+                <stop offset="0.5" stop-color="#4c1d95"/>
+                <stop offset="1" stop-color="#12041f"/>
+              </linearGradient>
+              <linearGradient id="logoTextGrad" x1="11" y1="12" x2="21" y2="20">
+                <stop stop-color="#ffffff"/>
+                <stop offset="1" stop-color="#fde68a"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="logo-text">NBD Casino</span>
+        </a>
+        <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item" data-nav="casino">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+          Casino
+        </a>
+        <a href="originals.html" class="nav-item active" data-nav="originals">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Originals
+        </a>
+        <a href="leaderboard.html" class="nav-item" data-nav="leaderboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 010-5H6M18 9h1.5a2.5 2.5 0 000-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0012 0V2z"/></svg>
+          Leaderboard
+        </a>
+        <a href="index.html" class="nav-item" data-nav="support">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Live Chat
+        </a>
+      </nav>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="top-header">
+        <div class="header-start">
+          <button class="hamburger" id="hamburger" aria-label="Open menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          </button>
+          <a href="originals.html" class="bj-back">← Originals</a>
+        </div>
+        <div class="header-center">
+          <div class="header-wallet">
+            <button class="wallet-balance" id="walletBalance" type="button" aria-haspopup="true" aria-expanded="false">
+              <span class="wallet-currency-icon">$</span>
+              <span class="wallet-amount" id="walletAmount">0.00</span>
+              <svg class="wallet-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <button class="wallet-deposit" id="walletDeposit" type="button">Deposit</button>
+            <div class="wallet-dropdown" id="walletDropdown" hidden>
+              <button type="button" class="wallet-option active" data-currency="USD" data-amount="0.00">USD — $0.00</button>
+              <button type="button" class="wallet-option" data-currency="BTC" data-amount="0.00000000">BTC — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="ETH" data-amount="0.00000000">ETH — 0.00000000</button>
+              <button type="button" class="wallet-option" data-currency="LTC" data-amount="0.00000000">LTC — 0.00000000</button>
+            </div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost">Log In</button>
+          <button class="btn btn-primary">Register</button>
+        </div>
+      </header>
+
+      <div class="bj-game">
+        <aside class="bj-panel">
+          <div class="ddb-panel-title">Double Down Blackjack</div>
+
+          <div class="bj-field">
+            <div class="bj-field-head">
+              <label for="bjBet">Bet Amount</label>
+              <span id="bjBetCurrency">0.00 USD</span>
+            </div>
+            <div class="bj-bet-row">
+              <div class="bj-bet-input-wrap">
+                <span class="bj-bet-icon">$</span>
+                <input type="number" id="bjBet" class="bj-bet-input" min="0" step="0.01" value="10" placeholder="0.00">
+              </div>
+              <button type="button" class="bj-bet-adjust" id="bjHalf">1/2</button>
+              <button type="button" class="bj-bet-adjust" id="bjDouble">2x</button>
+            </div>
+          </div>
+
+          <div class="bj-actions">
+            <button type="button" class="bj-action" id="bjHit" disabled>Hit</button>
+            <button type="button" class="bj-action" id="bjStand" disabled>Stand</button>
+            <button type="button" class="bj-action" id="bjSplit" disabled>Split</button>
+            <button type="button" class="bj-action bj-action--double" id="bjDoubleDown" disabled>Double</button>
+          </div>
+
+          <button type="button" class="bj-place-bet" id="bjPlaceBet">Place Bet</button>
+          <p class="bj-message" id="bjMessage"></p>
+        </aside>
+
+        <main class="bj-table">
+          <div class="bj-deck" aria-hidden="true"></div>
+
+          <div class="bj-dealer">
+            <div class="bj-hand-label">Dealer <span id="bjDealerScore"></span></div>
+            <div class="bj-cards" id="bjDealerCards"></div>
+          </div>
+
+          <div class="bj-rules" id="bjRules">
+            <div class="bj-rules-box">DOUBLE DOWN • HIT AFTER DOUBLE</div>
+            <p>DEALER 22 PUSHES • BLACKJACK 3:2 • STANDS ON 17</p>
+          </div>
+
+          <div class="bj-player">
+            <div class="bj-hand-label">You <span id="bjPlayerScore"></span></div>
+            <div class="bj-cards" id="bjPlayerCards"></div>
+          </div>
+
+          <div class="bj-result-popup" id="bjResultPopup" hidden>
+            <div class="bj-result-popup-card" id="bjResultCard">
+              <p class="bj-result-popup-label" id="bjPopupLabel"></p>
+              <div class="bj-result-popup-main" id="bjPopupMain"></div>
+              <p class="bj-result-popup-text" id="bjPopupText"></p>
+            </div>
+          </div>
+
+          <div class="bj-footer">
+            <span class="bj-brand">NBD</span>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <script src="/js/common.js?v=3"></script>
+  <script src="/js/dd-blackjack.js"></script>
+</body>
+</html>

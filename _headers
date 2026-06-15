@@ -6,5 +6,11 @@
 /js/keno.js
   Cache-Control: public, max-age=300, must-revalidate
 
-/keno.html
+/css/settings.css
+  Cache-Control: public, max-age=300, must-revalidate
+
+/self-exclusion.html
+  Cache-Control: public, max-age=300, must-revalidate
+
+/security.html
   Cache-Control: public, max-age=300, must-revalidate

@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
-  <link rel="stylesheet" href="/css/settings.css">
+  <link rel="stylesheet" href="/css/settings.css?v=2">
 </head>
 <body data-page="self-exclusion">
   <div class="app">
@@ -75,7 +75,7 @@
           </nav>
         </aside>
 
-        <main class="settings-main">
+        <main class="settings-main exclusion-main">
           <div class="settings-page-head">
             <h1 class="settings-page-title">Self Exclusion</h1>
             <p class="settings-page-sub">Block betting on your account for a cooling-off period</p>
@@ -84,7 +84,7 @@
           <div class="settings-stack">
             <div class="exclusion-status" id="exclusionStatus" hidden></div>
 
-            <section class="settings-panel settings-panel--danger" id="exclusionFormPanel">
+            <section class="settings-panel settings-panel--danger exclusion-panel" id="exclusionFormPanel">
               <div class="settings-panel-head">
                 <span class="settings-panel-icon settings-panel-icon--danger">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -95,59 +95,81 @@
                 </div>
               </div>
 
-              <div class="exclusion-options" id="exclusionOptions">
+              <div class="exclusion-options" id="exclusionOptions" role="radiogroup" aria-label="Exclusion period">
                 <label class="exclusion-option">
                   <input type="radio" name="exclusionDuration" value="24h" checked>
                   <span class="exclusion-option-box">
-                    <span class="exclusion-option-title">24 hours</span>
-                    <span class="exclusion-option-desc">Short cooling-off break</span>
+                    <span class="exclusion-option-text">
+                      <span class="exclusion-option-title">24 hours</span>
+                      <span class="exclusion-option-desc">Short cooling-off break</span>
+                    </span>
+                    <span class="exclusion-option-check" aria-hidden="true"></span>
                   </span>
                 </label>
                 <label class="exclusion-option">
                   <input type="radio" name="exclusionDuration" value="7d">
                   <span class="exclusion-option-box">
-                    <span class="exclusion-option-title">7 days</span>
-                    <span class="exclusion-option-desc">One week away from betting</span>
+                    <span class="exclusion-option-text">
+                      <span class="exclusion-option-title">7 days</span>
+                      <span class="exclusion-option-desc">One week away from betting</span>
+                    </span>
+                    <span class="exclusion-option-check" aria-hidden="true"></span>
                   </span>
                 </label>
                 <label class="exclusion-option">
                   <input type="radio" name="exclusionDuration" value="30d">
                   <span class="exclusion-option-box">
-                    <span class="exclusion-option-title">30 days</span>
-                    <span class="exclusion-option-desc">One month exclusion</span>
+                    <span class="exclusion-option-text">
+                      <span class="exclusion-option-title">30 days</span>
+                      <span class="exclusion-option-desc">One month exclusion</span>
+                    </span>
+                    <span class="exclusion-option-check" aria-hidden="true"></span>
                   </span>
                 </label>
                 <label class="exclusion-option">
                   <input type="radio" name="exclusionDuration" value="6mo">
                   <span class="exclusion-option-box">
-                    <span class="exclusion-option-title">6 months</span>
-                    <span class="exclusion-option-desc">Extended break</span>
+                    <span class="exclusion-option-text">
+                      <span class="exclusion-option-title">6 months</span>
+                      <span class="exclusion-option-desc">Extended break</span>
+                    </span>
+                    <span class="exclusion-option-check" aria-hidden="true"></span>
                   </span>
                 </label>
                 <label class="exclusion-option">
                   <input type="radio" name="exclusionDuration" value="1y">
                   <span class="exclusion-option-box">
-                    <span class="exclusion-option-title">1 year</span>
-                    <span class="exclusion-option-desc">Long-term exclusion</span>
+                    <span class="exclusion-option-text">
+                      <span class="exclusion-option-title">1 year</span>
+                      <span class="exclusion-option-desc">Long-term exclusion</span>
+                    </span>
+                    <span class="exclusion-option-check" aria-hidden="true"></span>
                   </span>
                 </label>
-                <label class="exclusion-option">
+                <label class="exclusion-option exclusion-option--permanent">
                   <input type="radio" name="exclusionDuration" value="permanent">
                   <span class="exclusion-option-box">
-                    <span class="exclusion-option-title">Permanent</span>
-                    <span class="exclusion-option-desc">Cannot be reversed by you</span>
+                    <span class="exclusion-option-text">
+                      <span class="exclusion-option-title">Permanent</span>
+                      <span class="exclusion-option-desc">Cannot be reversed by you — contact support only</span>
+                    </span>
+                    <span class="exclusion-option-check" aria-hidden="true"></span>
                   </span>
                 </label>
               </div>
 
               <div class="exclusion-confirm">
+                <div class="exclusion-confirm-head">
+                  <h3 class="exclusion-confirm-title">Confirm activation</h3>
+                  <p class="exclusion-confirm-sub">Type your username to enable self-exclusion on your account</p>
+                </div>
                 <label class="security-field">
-                  <span class="security-field-label">Type your username to confirm</span>
-                  <input type="text" id="exclusionConfirmUser" class="security-input" maxlength="16" autocomplete="off" placeholder="Your username">
+                  <span class="security-field-label">Username</span>
+                  <input type="text" id="exclusionConfirmUser" class="security-input" maxlength="16" autocomplete="off" placeholder="Enter your username">
                 </label>
                 <p class="security-note">Self-exclusion applies immediately and is stored on your account. Contact support if you need help.</p>
                 <p class="security-message" id="exclusionMessage" hidden></p>
-                <button type="button" class="settings-action-btn settings-action-btn--danger" id="exclusionSubmit">Activate Self Exclusion</button>
+                <button type="button" class="exclusion-submit" id="exclusionSubmit">Activate Self Exclusion</button>
               </div>
             </section>
           </div>

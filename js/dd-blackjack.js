@@ -14,8 +14,8 @@ const state = {
   player: [],
   dealer: [],
   bet: 0,
+  baseBet: 0,
   phase: 'idle',
-  doubled: false,
   busy: false,
 };
 
@@ -245,6 +245,15 @@ function updateBetLabels() {
   els.betCurrency.textContent = fmt(els.bet.value);
 }
 
+function canDoubleDown() {
+  if (state.phase !== 'playing' || state.busy) return false;
+  if (state.player.length < 2) return false;
+  if (handValue(state.player) > 21) return false;
+  const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
+  const balance = window.XythonWallet?.getBalance(currency) ?? 0;
+  return state.baseBet > 0 && state.baseBet <= balance;
+}
+
 function updateUI() {
   const playing = state.phase === 'playing' && !state.busy;
   const locked = state.busy || state.phase === 'dealing' || state.phase === 'dealer';
@@ -252,7 +261,7 @@ function updateUI() {
   els.placeBet.textContent = loggedIn ? 'Place Bet' : 'Register to Bet';
   els.hit.disabled = !playing;
   els.stand.disabled = !playing;
-  els.doubleDown.disabled = !(playing && state.player.length === 2 && !state.doubled);
+  els.doubleDown.disabled = !canDoubleDown();
   els.split.disabled = true;
   els.placeBet.disabled = locked || state.phase === 'playing' || state.phase === 'dealer';
   els.bet.disabled = locked || state.phase === 'playing' || state.phase === 'dealer';
@@ -294,7 +303,7 @@ async function placeBet() {
   }
 
   state.bet = bet;
-  state.doubled = false;
+  state.baseBet = bet;
   state.deck = shuffle(createDeck());
   state.phase = 'dealing';
   state.busy = true;
@@ -354,21 +363,18 @@ async function stand() {
 }
 
 async function doubleDown() {
-  if (state.phase !== 'playing' || state.busy || state.player.length !== 2 || state.doubled) return;
+  if (!canDoubleDown()) return;
 
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
   const balance = window.XythonWallet?.getBalance(currency) ?? 0;
-  if (state.bet > balance) {
-    setMessage('Insufficient balance to double', 'lose');
-    return;
-  }
+  const add = state.baseBet;
 
   state.busy = true;
   updateUI();
-  const debitResult = window.XythonWallet?.setBalance(currency, balance - state.bet, {
+  const debitResult = window.XythonWallet?.setBalance(currency, balance - add, {
     type: 'bet',
     label: GAME_LABEL,
-    detail: `Double down — $${state.bet.toFixed(2)}`,
+    detail: `Double down — $${add.toFixed(2)}`,
     game: GAME_ID,
   });
   if (debitResult?.ok === false) {
@@ -377,8 +383,7 @@ async function doubleDown() {
     setMessage(debitResult.error, 'lose');
     return;
   }
-  state.bet *= 2;
-  state.doubled = true;
+  state.bet += add;
 
   await wait(300);
   appendPlayerCard(draw());
@@ -466,5 +471,6 @@ function finishRound(result, msg) {
   window.XythonStats?.recordRound?.(wager, won, { game: GAME_ID, payout });
 
   state.bet = 0;
+  state.baseBet = 0;
   updateUI();
 }

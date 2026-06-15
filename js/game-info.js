@@ -12,8 +12,8 @@ const GAME_INFO = {
     rtp: 98.50,
     gradient: 'linear-gradient(180deg, #fcd34d 0%, #d97706 55%, #78350f 100%)',
     emoji: '🃏',
-    tagline: 'Aggressive doubles, hit after double, dealer 22 pushes.',
-    description: 'A high-action blackjack variant — double your bet and keep hitting, dealer stands on 17, blackjack pays 3:2, and if the dealer totals exactly 22, all non-busted hands push.',
+    tagline: 'Multi double, hit after double, dealer 22 pushes.',
+    description: 'A high-action blackjack variant — double down as many times as you want (each adds your original bet), keep hitting after doubles, dealer stands on 17, blackjack pays 3:2, and if the dealer totals exactly 22, all non-busted hands push.',
   },
   plinko: {
     name: 'Plinko',

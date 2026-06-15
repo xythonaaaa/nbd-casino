@@ -4910,7 +4910,7 @@ function initGameInfoLoader() {
 
   if (document.querySelector('script[data-gi-js]')) return;
   const script = document.createElement('script');
-  script.src = 'js/game-info.js';
+  script.src = sitePath('js/game-info.js?v=2');
   script.dataset.giJs = '1';
   script.onload = () => window.NbdGameInfo?.init?.();
   document.body.appendChild(script);

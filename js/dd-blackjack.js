@@ -6,6 +6,7 @@ const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 
 const DEAL_DELAY = 550;
 const POPUP_MS = 2800;
+const HISTORY_MAX = 20;
 
 let popupTimer = null;
 
@@ -17,6 +18,7 @@ const state = {
   baseBet: 0,
   phase: 'idle',
   busy: false,
+  history: [],
 };
 
 const els = {};
@@ -44,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
   els.popupLabel = document.getElementById('bjPopupLabel');
   els.popupMain = document.getElementById('bjPopupMain');
   els.popupText = document.getElementById('bjPopupText');
+  els.historyList = document.getElementById('ddbHistoryList');
 
   els.half.addEventListener('click', () => adjustBetInput(els.bet));
   els.doubleBet.addEventListener('click', () => doubleBetInput(els.bet));
@@ -237,6 +240,33 @@ function showResultPopup(result, payout, wager) {
       popupTimer = null;
     }, 200);
   }, POPUP_MS);
+}
+
+function pushHistory(entry) {
+  state.history.unshift(entry);
+  if (state.history.length > HISTORY_MAX) state.history.pop();
+  renderHistory();
+}
+
+function renderHistory() {
+  if (!els.historyList) return;
+
+  if (!state.history.length) {
+    els.historyList.innerHTML = '<p class="ddb-history-empty">No hands yet</p>';
+    return;
+  }
+
+  els.historyList.innerHTML = state.history.map((item, i) => {
+    const cls = item.result === 'blackjack'
+      ? 'blackjack'
+      : item.result === 'win'
+        ? 'win'
+        : item.result === 'push'
+          ? 'push'
+          : 'lose';
+    const label = item.result === 'lose' ? 'Loss' : `${item.mult.toFixed(2)}x`;
+    return `<div class="ddb-history-item ddb-history-item--${cls}${i === 0 ? ' is-new' : ''}">${label}</div>`;
+  }).join('');
 }
 
 function updateBetLabels() {
@@ -449,6 +479,9 @@ function finishRound(result, msg) {
     setMessage(msg || 'You lose', 'lose');
   }
 
+  const mult = wager > 0 ? payout / wager : 0;
+  pushHistory({ result, mult });
+
   showResultPopup(result, payout, wager);
 
   if (payout > 0) {
@@ -468,7 +501,7 @@ function finishRound(result, msg) {
     : result === 'lose'
       ? false
       : null;
-  window.XythonStats?.recordRound?.(wager, won, { game: GAME_ID, payout });
+  window.XythonStats?.recordRound?.(wager, won, { game: GAME_ID, payout, mult });
 
   state.bet = 0;
   state.baseBet = 0;

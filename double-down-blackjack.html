@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/blackjack.css">
-  <link rel="stylesheet" href="/css/dd-blackjack.css">
+  <link rel="stylesheet" href="/css/dd-blackjack.css?v=2">
 </head>
 <body class="ddb-page" data-page="originals">
   <div class="app">
@@ -149,13 +149,20 @@
             <span class="bj-brand">NBD</span>
           </div>
         </main>
+
+        <aside class="ddb-history" aria-label="Recent hands">
+          <span class="ddb-history-head">Recent</span>
+          <div class="ddb-history-list" id="ddbHistoryList">
+            <p class="ddb-history-empty">No hands yet</p>
+          </div>
+        </aside>
       </div>
     </div>
   </div>
 
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-  <script src="/js/common.js?v=3"></script>
-  <script src="/js/dd-blackjack.js?v=3"></script>
+  <script src="/js/common.js?v=4"></script>
+  <script src="/js/dd-blackjack.js?v=4"></script>
 </body>
 </html>

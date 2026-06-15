@@ -2,8 +2,6 @@ const GRID_SIZE = 25;
 const HOUSE_EDGE = 0.99;
 const AUTO_REVEAL_MS = 120;
 const AUTO_ROUND_GAP_MS = 400;
-const MANUAL_RESET_WIN_MS = 1200;
-const MANUAL_RESET_LOSE_MS = 2200;
 
 const state = {
   panel: 'manual',
@@ -157,7 +155,7 @@ function handleGridClick(e) {
 }
 
 function setPanel(panel) {
-  if (state.auto.running || state.phase === 'active') return;
+  if (state.auto.running || state.phase === 'active' || state.phase === 'ended') return;
   state.panel = panel;
   els.tabManual.classList.toggle('active', panel === 'manual');
   els.tabAuto.classList.toggle('active', panel === 'auto');
@@ -276,7 +274,7 @@ function updateGridHint() {
 }
 
 function syncGridView() {
-  if (state.phase === 'active' || state.auto.running) return;
+  if (state.phase === 'active' || state.phase === 'ended' || state.auto.running) return;
 
   if (state.panel === 'auto') {
     setupAutoPickGrid();
@@ -400,8 +398,8 @@ function updateUI() {
   els.mines.disabled = active || autoRunning;
   els.half.disabled = active || autoRunning;
   els.doubleBet.disabled = active || autoRunning;
-  els.tabManual.disabled = autoRunning || active;
-  els.tabAuto.disabled = autoRunning || active;
+  els.tabManual.disabled = autoRunning || active || state.phase === 'ended';
+  els.tabAuto.disabled = autoRunning || active || state.phase === 'ended';
 
   els.panelEl?.classList.toggle('is-auto-running', autoRunning);
   els.panelEl?.classList.toggle('mn-panel--manual-idle', manual && !active && !autoRunning);
@@ -419,7 +417,7 @@ function updateUI() {
 
   if (!autoRunning) syncAutoInfinityUI();
 
-  if (!active && !autoRunning) {
+  if (!active && !autoRunning && state.phase !== 'ended') {
     syncGridView();
   }
 
@@ -574,6 +572,8 @@ function resetRound() {
 async function startRound() {
   if (state.auto.running || state.panel !== 'manual') return;
 
+  if (state.phase === 'ended') resetRound();
+
   const bet = parseFloat(els.bet.value);
   const error = validateBetAmount(bet);
   if (error) {
@@ -613,7 +613,6 @@ function handleManualLoss(hitIndex) {
   finalizeLoss(hitIndex);
   setMessage(`Mine hit — lost $${state.bet.toFixed(2)}`, 'lose');
   state.phase = 'ended';
-  setTimeout(resetRound, MANUAL_RESET_LOSE_MS);
   updateUI();
 }
 
@@ -624,7 +623,6 @@ function handleManualCashout(perfectBoard) {
     : `Cashed out $${result.payout.toFixed(2)} at ${result.mult.toFixed(2)}x`;
   setMessage(msg, 'win');
   state.phase = 'ended';
-  setTimeout(resetRound, MANUAL_RESET_WIN_MS);
   updateUI();
 }
 

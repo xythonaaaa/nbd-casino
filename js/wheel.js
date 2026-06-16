@@ -44,7 +44,7 @@ const RISKS = {
       { mult: 0, color: '#374151', label: '0x', weight: 3 },
       { mult: 1.5, color: '#c026d3', label: '1.5x', weight: 1.2 },
       { mult: 3, color: '#fde047', label: '3x', text: '#1e1b4b', weight: 0.7 },
-      { mult: 15, color: '#fbbf24', label: '15x', text: '#1e1b4b', weight: 0.08 },
+      { mult: 30, color: '#fbbf24', label: '30x', text: '#1e1b4b', weight: 0.08 },
     ],
   },
 };

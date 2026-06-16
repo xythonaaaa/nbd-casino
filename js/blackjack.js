@@ -219,31 +219,68 @@ function clearTable() {
 function renderPlayerHands() {
   if (!els.playerHands) return;
   els.playerHands.innerHTML = '';
+  const isSplit = state.hands.length > 1;
+  els.playerHands.classList.toggle('is-split', isSplit);
 
   state.hands.forEach((hand, index) => {
     const slot = document.createElement('div');
     slot.className = 'bj-hand-slot';
-    if (index === state.activeHandIndex && state.phase === 'playing' && !hand.done) {
-      slot.classList.add('is-active');
-    }
+    const isActive = index === state.activeHandIndex && state.phase === 'playing' && !hand.done;
+    if (isActive) slot.classList.add('is-active');
     if (hand.done) slot.classList.add('is-done');
 
-    if (state.hands.length > 1) {
-      const label = document.createElement('div');
-      label.className = 'bj-hand-slot-label';
-      label.textContent = `Hand ${index + 1} · $${hand.bet.toFixed(2)}`;
-      slot.appendChild(label);
+    if (isSplit) {
+      const head = document.createElement('div');
+      head.className = 'bj-hand-slot-head';
+
+      const pill = document.createElement('span');
+      pill.className = 'bj-hand-slot-pill';
+      pill.textContent = `Hand ${index + 1}`;
+
+      const bet = document.createElement('span');
+      bet.className = 'bj-hand-slot-bet';
+      bet.textContent = `$${hand.bet.toFixed(2)}`;
+
+      head.appendChild(pill);
+      head.appendChild(bet);
+      slot.appendChild(head);
+
+      if (hand.cards.length) {
+        const score = document.createElement('div');
+        score.className = 'bj-hand-slot-score';
+        score.textContent = handValueDisplay(hand.cards);
+        slot.appendChild(score);
+      }
     }
 
     const cardsEl = document.createElement('div');
     cardsEl.className = 'bj-cards';
     hand.cards.forEach(card => cardsEl.appendChild(renderCard(card)));
     slot.appendChild(cardsEl);
+
+    if (isSplit) {
+      if (isActive) {
+        const status = document.createElement('div');
+        status.className = 'bj-hand-slot-status';
+        status.textContent = 'Playing';
+        slot.appendChild(status);
+      } else if (hand.done) {
+        const status = document.createElement('div');
+        status.className = 'bj-hand-slot-status bj-hand-slot-status--done';
+        status.textContent = handValue(hand.cards) > 21 ? 'Bust' : 'Done';
+        slot.appendChild(status);
+      }
+    }
+
     els.playerHands.appendChild(slot);
   });
 
   const active = getActiveHand();
-  els.playerScore.textContent = active?.cards.length ? handValueDisplay(active.cards) : '';
+  if (isSplit && active?.cards.length) {
+    els.playerScore.textContent = `Hand ${state.activeHandIndex + 1} · ${handValueDisplay(active.cards)}`;
+  } else {
+    els.playerScore.textContent = active?.cards.length ? handValueDisplay(active.cards) : '';
+  }
 }
 
 function appendPlayerCard(card, handIndex = state.activeHandIndex) {

@@ -3,6 +3,9 @@ const ORIGINALS_GAMES = new Set([
   'keno', 'limbo', 'war', 'coinflip', 'hilo', 'tower', 'wheel',
 ]);
 
+const LEADERBOARD_MAX_BET = 10000;
+const BANNED_LEADERBOARD_USERS = new Set(['tiddlesz']);
+
 let activeFilter = 'originals';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -41,8 +44,15 @@ function displayName(win, key) {
   return win.user || 'Player';
 }
 
+function isBlockedWin(win) {
+  if ((parseFloat(win?.bet) || 0) > LEADERBOARD_MAX_BET) return true;
+  if (BANNED_LEADERBOARD_USERS.has(playerKey(win))) return true;
+  return false;
+}
+
 function aggregateLeaderboard(wins, filter) {
   const filtered = wins.filter(w => {
+    if (isBlockedWin(w)) return false;
     if (filter === 'originals') return ORIGINALS_GAMES.has(w.game);
     return true;
   });
@@ -84,12 +94,16 @@ function getInitial(name) {
   return text.charAt(0).toUpperCase();
 }
 
-function renderLeaderboard() {
+async function renderLeaderboard() {
   const tbody = document.getElementById('leaderboardBody');
   const meta = document.getElementById('leaderboardMeta');
   if (!tbody) return;
 
-  const wins = window.NbdLeaderboard?.getRecentWins?.(500) || loadLeaderboardFallback().wins;
+  if (window.NbdLeaderboard?.refresh) {
+    await window.NbdLeaderboard.refresh();
+  }
+
+  const wins = window.NbdLeaderboard?.getRecentWins?.(500) || [];
   const rows = aggregateLeaderboard(wins, activeFilter);
   const me = (typeof getLoggedInUsername === 'function' ? (getLoggedInUsername() || '') : '').trim().toLowerCase();
 
@@ -127,15 +141,4 @@ function renderLeaderboard() {
       <td><span class="leaderboard-amount--muted">${row.winCount.toLocaleString()}</span></td>
     </tr>`;
   }).join('');
-}
-
-function loadLeaderboardFallback() {
-  try {
-    const raw = localStorage.getItem('nbd-leaderboard-v2');
-    if (!raw) return { wins: [] };
-    const data = JSON.parse(raw);
-    return { wins: Array.isArray(data?.wins) ? data.wins : [] };
-  } catch {
-    return { wins: [] };
-  }
 }

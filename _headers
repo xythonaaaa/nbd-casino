@@ -9,6 +9,9 @@
 /css/mines.css
   Cache-Control: public, max-age=60, must-revalidate
 
+/api/leaderboard
+  Cache-Control: no-store
+
 /js/common.js
   Cache-Control: public, max-age=300, must-revalidate
 

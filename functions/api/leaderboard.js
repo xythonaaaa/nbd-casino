@@ -6,6 +6,7 @@ const MAX_WINS = 500;
 const MAX_RECENT_BETS = 100;
 const LEADERBOARD_MAX_BET = 10000;
 const STORE_KEY = 'data';
+const BANNED_LEADERBOARD_USERS = new Set(['tiddlesz']);
 const ORIGINALS_GAMES = new Set([
   'blackjack', 'double-down-blackjack', 'plinko', 'roulette', 'dice', 'mines', 'crash',
   'keno', 'limbo', 'war', 'coinflip', 'hilo', 'tower', 'wheel',
@@ -75,9 +76,25 @@ function removePlayersFromLeaderboard(data, keys) {
   return removed;
 }
 
+function isBlockedLeaderboardEntry(entry) {
+  if ((parseFloat(entry?.bet) || 0) > LEADERBOARD_MAX_BET) return true;
+  if (BANNED_LEADERBOARD_USERS.has(userKey(entry?.user))) return true;
+  return false;
+}
+
+function sanitizeLeaderboardData(data) {
+  const normalized = normalizeData(data);
+  const before = normalized.wins.length + normalized.recentBets.length;
+  normalized.wins = normalized.wins.filter(w => !isBlockedLeaderboardEntry(w));
+  normalized.recentBets = normalized.recentBets.filter(b => !isBlockedLeaderboardEntry(b));
+  return { data: normalized, changed: before !== normalized.wins.length + normalized.recentBets.length };
+}
+
 async function loadData(kv) {
-  const data = (await kvGet(kv, STORE_KEY, defaultData())) || defaultData();
-  return normalizeData(data);
+  const raw = (await kvGet(kv, STORE_KEY, defaultData())) || defaultData();
+  const { data, changed } = sanitizeLeaderboardData(raw);
+  if (changed) await saveData(kv, data);
+  return data;
 }
 
 async function saveData(kv, data) {
@@ -145,9 +162,10 @@ export async function onRequest(context) {
 
     const betAmt = Math.max(0, parseFloat(payload.bet) || 0);
     const payAmt = Math.max(0, parseFloat(payload.payout) || 0);
-    if (betAmt > LEADERBOARD_MAX_BET) {
+    const user = String(payload.user || 'Player').trim().slice(0, 16) || 'Player';
+    if (betAmt > LEADERBOARD_MAX_BET || BANNED_LEADERBOARD_USERS.has(userKey(user))) {
       const data = await loadData(kv);
-      return json({ ok: true, ignored: 'bet_too_large', ...data });
+      return json({ ok: true, ignored: 'blocked', ...data });
     }
 
     const data = await loadData(kv);
@@ -161,7 +179,7 @@ export async function onRequest(context) {
     pushRecentBet(data, {
       id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
       game,
-      user: String(payload.user || 'Player').trim().slice(0, 16) || 'Player',
+      user,
       hidden: !!payload.hidden,
       bet: betAmt,
       payout: payAmt,
@@ -174,7 +192,7 @@ export async function onRequest(context) {
       data.wins.unshift({
         id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
         game,
-        user: String(payload.user || 'Player').trim().slice(0, 16) || 'Player',
+        user,
         hidden: !!payload.hidden,
         bet: betAmt,
         payout: payAmt,

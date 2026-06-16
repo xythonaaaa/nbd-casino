@@ -1628,6 +1628,7 @@ async function recordLeaderboardRound({ game, bet, payout, mult, won }) {
   if (betAmt > 10000) return;
   const hidden = !!loadUserSettings().privateMode;
   const user = hidden ? 'Hidden' : (getLoggedInUsername() || 'Player');
+  if (!hidden && user.trim().toLowerCase() === 'tiddlesz') return;
   const multiplier = mult != null ? parseFloat(mult) : (betAmt > 0 ? payAmt / betAmt : 0);
   const roundedMult = Math.round(multiplier * 100) / 100;
 

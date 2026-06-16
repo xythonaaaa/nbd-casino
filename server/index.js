@@ -12,6 +12,7 @@ const MAX_MESSAGES = 200;
 const MAX_WINS = 500;
 const MAX_RECENT_BETS = 100;
 const LEADERBOARD_MAX_BET = 10000;
+const BANNED_LEADERBOARD_USERS = new Set(['tiddlesz']);
 const AFFILIATE_COMMISSION_RATE = 0.05;
 const AFFILIATE_MIN_CLAIM = 0.01;
 const WALLET_ADMIN_USERNAMES = ['ceo'];
@@ -60,14 +61,30 @@ function saveMessages(messages) {
   fs.writeFileSync(CHAT_FILE, JSON.stringify(messages.slice(-MAX_MESSAGES), null, 2));
 }
 
+function isBlockedLeaderboardEntry(entry) {
+  if ((parseFloat(entry?.bet) || 0) > LEADERBOARD_MAX_BET) return true;
+  const key = String(entry?.user || '').trim().toLowerCase();
+  if (BANNED_LEADERBOARD_USERS.has(key)) return true;
+  return false;
+}
+
+function sanitizeLeaderboard(data) {
+  const before = data.wins.length + data.recentBets.length;
+  data.wins = data.wins.filter(w => !isBlockedLeaderboardEntry(w));
+  data.recentBets = data.recentBets.filter(b => !isBlockedLeaderboardEntry(b));
+  return before !== data.wins.length + data.recentBets.length;
+}
+
 function loadLeaderboard() {
   try {
     const parsed = JSON.parse(fs.readFileSync(LEADERBOARD_FILE, 'utf8'));
-    return {
+    const data = {
       wins: Array.isArray(parsed.wins) ? parsed.wins : [],
       bets: parsed.bets && typeof parsed.bets === 'object' ? parsed.bets : {},
       recentBets: Array.isArray(parsed.recentBets) ? parsed.recentBets : [],
     };
+    if (sanitizeLeaderboard(data)) saveLeaderboard(data);
+    return data;
   } catch {
     return { wins: [], bets: {}, recentBets: [] };
   }
@@ -939,7 +956,8 @@ function appendLeaderboardRound(payload) {
 
   const betAmt = Math.max(0, parseFloat(payload.bet) || 0);
   const payAmt = Math.max(0, parseFloat(payload.payout) || 0);
-  if (betAmt > LEADERBOARD_MAX_BET) {
+  const user = String(payload.user || 'Player').trim().slice(0, 16) || 'Player';
+  if (betAmt > LEADERBOARD_MAX_BET || BANNED_LEADERBOARD_USERS.has(user.toLowerCase())) {
     return loadLeaderboard();
   }
 
@@ -952,7 +970,7 @@ function appendLeaderboardRound(payload) {
   data.recentBets.unshift({
     id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
     game,
-    user: String(payload.user || 'Player').trim().slice(0, 16) || 'Player',
+    user,
     hidden: !!payload.hidden,
     bet: betAmt,
     payout: payAmt,
@@ -966,7 +984,7 @@ function appendLeaderboardRound(payload) {
     data.wins.unshift({
       id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
       game,
-      user: String(payload.user || 'Player').trim().slice(0, 16) || 'Player',
+      user,
       hidden: !!payload.hidden,
       bet: betAmt,
       payout: payAmt,

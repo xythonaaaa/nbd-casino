@@ -4,6 +4,7 @@ import { kvGet, kvSet } from '../lib/kv.js';
 
 const MAX_WINS = 500;
 const MAX_RECENT_BETS = 100;
+const LEADERBOARD_MAX_BET = 10000;
 const STORE_KEY = 'data';
 const ORIGINALS_GAMES = new Set([
   'blackjack', 'double-down-blackjack', 'plinko', 'roulette', 'dice', 'mines', 'crash',
@@ -142,11 +143,16 @@ export async function onRequest(context) {
       return json({ error: 'Invalid game' }, 400);
     }
 
+    const betAmt = Math.max(0, parseFloat(payload.bet) || 0);
+    const payAmt = Math.max(0, parseFloat(payload.payout) || 0);
+    if (betAmt > LEADERBOARD_MAX_BET) {
+      const data = await loadData(kv);
+      return json({ ok: true, ignored: 'bet_too_large', ...data });
+    }
+
     const data = await loadData(kv);
     data.bets[game] = (data.bets[game] || 0) + 1;
 
-    const betAmt = Math.max(0, parseFloat(payload.bet) || 0);
-    const payAmt = Math.max(0, parseFloat(payload.payout) || 0);
     const won = payload.won === true;
     const mult = payload.mult != null
       ? Math.round(parseFloat(payload.mult) * 100) / 100

@@ -11,6 +11,7 @@ const PORT = Number(process.env.PORT) || 8080;
 const MAX_MESSAGES = 200;
 const MAX_WINS = 500;
 const MAX_RECENT_BETS = 100;
+const LEADERBOARD_MAX_BET = 10000;
 const AFFILIATE_COMMISSION_RATE = 0.05;
 const AFFILIATE_MIN_CLAIM = 0.01;
 const WALLET_ADMIN_USERNAMES = ['ceo'];
@@ -938,6 +939,10 @@ function appendLeaderboardRound(payload) {
 
   const betAmt = Math.max(0, parseFloat(payload.bet) || 0);
   const payAmt = Math.max(0, parseFloat(payload.payout) || 0);
+  if (betAmt > LEADERBOARD_MAX_BET) {
+    return loadLeaderboard();
+  }
+
   const won = payload.won === true;
   const mult = payload.mult != null
     ? Math.round(parseFloat(payload.mult) * 100) / 100

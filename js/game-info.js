@@ -105,11 +105,11 @@ const GAME_INFO = {
   },
   wheel: {
     name: 'Wheel',
-    rtp: 97.00,
+    rtp: 92.00,
     gradient: 'linear-gradient(180deg, #e879f9 0%, #c026d3 55%, #701a75 100%)',
     emoji: '🎡',
-    tagline: 'Spin the wheel for multiplier segments.',
-    description: 'Pick your risk level and spin the prize wheel. Land on multiplier segments from 0x up to 50x on Hard mode. Low, Med, and Hard risk levels change the segment layout.',
+    tagline: 'Spin the wheel — mostly losses, rare big hits.',
+    description: 'Pick Low, Med, or Hard risk. Hard mode is mostly 0x segments with a rare 15x jackpot slice. Weighted odds mean most spins lose — big multipliers are uncommon.',
   },
 };
 

@@ -1625,7 +1625,7 @@ async function recordLeaderboardRound({ game, bet, payout, mult, won }) {
 
   const betAmt = parseFloat(bet) || 0;
   const payAmt = parseFloat(payout) || 0;
-  if (betAmt > 10000) return;
+  if (betAmt > 1000) return;
   const hidden = !!loadUserSettings().privateMode;
   const user = hidden ? 'Hidden' : (getLoggedInUsername() || 'Player');
   if (!hidden && user.trim().toLowerCase() === 'tiddlesz') return;

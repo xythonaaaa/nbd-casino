@@ -4,7 +4,7 @@ import { kvGet, kvSet } from '../lib/kv.js';
 
 const MAX_WINS = 500;
 const MAX_RECENT_BETS = 100;
-const LEADERBOARD_MAX_BET = 10000;
+const LEADERBOARD_MAX_BET = 1000;
 const STORE_KEY = 'data';
 const BANNED_LEADERBOARD_USERS = new Set(['tiddlesz']);
 const ORIGINALS_GAMES = new Set([

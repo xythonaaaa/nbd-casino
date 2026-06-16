@@ -3,7 +3,7 @@ const ORIGINALS_GAMES = new Set([
   'keno', 'limbo', 'war', 'coinflip', 'hilo', 'tower', 'wheel',
 ]);
 
-const LEADERBOARD_MAX_BET = 10000;
+const LEADERBOARD_MAX_BET = 1000;
 const BANNED_LEADERBOARD_USERS = new Set(['tiddlesz']);
 
 let activeFilter = 'originals';

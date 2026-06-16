@@ -487,9 +487,6 @@ async function placeBet() {
     return;
   }
 
-  state.hands = [createHand(bet)];
-  state.activeHandIndex = 0;
-  state.splitUsed = false;
   state.sideBets = sideBets;
   state.deck = shuffle(createDeck());
   state.phase = 'dealing';
@@ -497,6 +494,9 @@ async function placeBet() {
   hidePopup();
   setMessage('');
   clearTable();
+  state.hands = [createHand(bet)];
+  state.activeHandIndex = 0;
+  state.splitUsed = false;
   updateUI();
 
   await wait(250);

@@ -551,6 +551,45 @@ function resetPlayerWallet(store, admin, username) {
   return { ok: true, username: player, grants: getWalletGrants(store, player) };
 }
 
+function getPlayerProfile(store, username) {
+  const meta = store.userMeta?.[walletUserKey(username)] || {};
+  const profile = meta.profile;
+  if (!profile || typeof profile !== 'object') return null;
+  const updatedAt = Math.max(0, parseInt(profile.updatedAt, 10) || 0);
+  if (!updatedAt) return null;
+  return {
+    updatedAt,
+    wagered: profile.wagered != null ? Math.max(0, parseFloat(profile.wagered) || 0) : null,
+    rakebackResetAt: Math.max(0, parseInt(profile.rakebackResetAt, 10) || 0),
+  };
+}
+
+function setPlayerProfile(store, admin, username, options = {}) {
+  const adminName = String(admin || '').trim();
+  const playerRaw = String(username || '').trim().slice(0, 16);
+  if (!isWalletAdmin(adminName)) return { error: 'Admin only' };
+  if (!playerRaw) return { error: 'Invalid username' };
+
+  const player = resolveWalletUser(store, playerRaw);
+  if (!player) return { error: 'Player not found' };
+
+  const meta = ensureWalletUserMeta(store, player);
+  const prev = meta.profile && typeof meta.profile === 'object' ? meta.profile : {};
+  const now = Date.now();
+
+  meta.profile = {
+    updatedAt: now,
+    wagered: options.wagered != null
+      ? Math.max(0, parseFloat(options.wagered) || 0)
+      : (prev.wagered ?? null),
+    rakebackResetAt: options.resetRakeback
+      ? now
+      : Math.max(0, parseInt(prev.rakebackResetAt, 10) || 0),
+  };
+
+  return { ok: true, username: player, profile: getPlayerProfile(store, player) };
+}
+
 function tipWalletPlayer(store, from, to, amount, currency) {
   const senderRaw = String(from || '').trim().slice(0, 16);
   const recipientRaw = String(to || '').trim().slice(0, 16);
@@ -879,6 +918,7 @@ function handleWalletRequest(req, res, urlPath) {
       balances: getWalletBalances(store, user),
       resetAt: store.resetAt || 0,
       account: getSelfExclusionStatus(store, user),
+      profile: getPlayerProfile(store, user),
     });
     return;
   }
@@ -920,6 +960,15 @@ function handleWalletRequest(req, res, urlPath) {
           result = resetAllWallets(store);
         } else if (action === 'reset-player') {
           result = resetPlayerWallet(store, payload.admin, payload.username || payload.to);
+          if (result.error) {
+            sendJson(res, result.error === 'Admin only' ? 403 : 400, result);
+            return;
+          }
+        } else if (action === 'set-player-profile') {
+          result = setPlayerProfile(store, payload.admin, payload.username || payload.to, {
+            wagered: payload.wagered,
+            resetRakeback: !!payload.resetRakeback,
+          });
           if (result.error) {
             sendJson(res, result.error === 'Admin only' ? 403 : 400, result);
             return;

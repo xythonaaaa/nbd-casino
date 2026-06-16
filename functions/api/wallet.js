@@ -289,6 +289,46 @@ function resetPlayerWallet(store, admin, username) {
   return { ok: true, username: player, grants: getGrantsForUser(store, player) };
 }
 
+function getPlayerProfile(store, username) {
+  const meta = store.userMeta?.[userKey(username)] || {};
+  const profile = meta.profile;
+  if (!profile || typeof profile !== 'object') return null;
+  const updatedAt = Math.max(0, parseInt(profile.updatedAt, 10) || 0);
+  if (!updatedAt) return null;
+  return {
+    updatedAt,
+    wagered: profile.wagered != null ? Math.max(0, parseFloat(profile.wagered) || 0) : null,
+    rakebackResetAt: Math.max(0, parseInt(profile.rakebackResetAt, 10) || 0),
+  };
+}
+
+function setPlayerProfile(store, admin, username, options = {}) {
+  const adminName = String(admin || '').trim();
+  const playerRaw = String(username || '').trim().slice(0, 16);
+
+  if (!isAdmin(adminName)) return { error: 'Admin only' };
+  if (!playerRaw) return { error: 'Invalid username' };
+
+  const player = resolveWalletUser(store, playerRaw);
+  if (!player) return { error: 'Player not found' };
+
+  const meta = ensureUserMeta(store, player);
+  const prev = meta.profile && typeof meta.profile === 'object' ? meta.profile : {};
+  const now = Date.now();
+
+  meta.profile = {
+    updatedAt: now,
+    wagered: options.wagered != null
+      ? Math.max(0, parseFloat(options.wagered) || 0)
+      : (prev.wagered ?? null),
+    rakebackResetAt: options.resetRakeback
+      ? now
+      : Math.max(0, parseInt(prev.rakebackResetAt, 10) || 0),
+  };
+
+  return { ok: true, username: player, profile: getPlayerProfile(store, player) };
+}
+
 function tipPlayer(store, from, to, amount, currency) {
   const senderRaw = String(from || '').trim().slice(0, 16);
   const recipientRaw = String(to || '').trim().slice(0, 16);
@@ -358,11 +398,13 @@ export async function onRequest(context) {
     if (!user.trim()) {
       return json({ error: 'Missing user' }, 400);
     }
+    const profile = getPlayerProfile(data, user);
     return json({
       grants: getGrantsForUser(data, user),
       balances: getBalancesForUser(data, user),
       resetAt: data.resetAt || 0,
       account: getSelfExclusionStatus(data, user),
+      profile,
     });
   }
 
@@ -394,6 +436,18 @@ export async function onRequest(context) {
       const target = payload.username || payload.to;
       const result = await writeStore(kv, data =>
         resetPlayerWallet(data, payload.admin, target)
+      );
+      if (result.error) return json(result, { status: result.error === 'Admin only' ? 403 : 400 });
+      return json(result);
+    }
+
+    if (payload.action === 'set-player-profile') {
+      const target = payload.username || payload.to;
+      const result = await writeStore(kv, data =>
+        setPlayerProfile(data, payload.admin, target, {
+          wagered: payload.wagered,
+          resetRakeback: !!payload.resetRakeback,
+        })
       );
       if (result.error) return json(result, { status: result.error === 'Admin only' ? 403 : 400 });
       return json(result);

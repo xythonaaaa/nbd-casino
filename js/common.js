@@ -27,6 +27,7 @@ function canDeposit() {
 
 const GRANTS_SYNC_KEY = 'xython-grants-synced';
 const WALLET_RESET_ACK_KEY = 'xython-wallet-reset-ack';
+const PROFILE_SYNC_ACK_KEY = 'xython-profile-sync';
 const WALLET_GRANTS_POLL_MS = 8000;
 const WALLET_CURRENCIES = ['USD', 'BTC', 'ETH', 'LTC'];
 
@@ -153,10 +154,12 @@ async function fetchServerGrants(username) {
     if (data.resetAt) await applyServerWalletReset(data.resetAt);
     if (!data.grants || typeof data.grants !== 'object') return null;
     if (data.account) applyAccountStatus(data.account);
+    if (data.profile) applyServerProfile(data.profile, username);
     return {
       grants: data.grants,
       balances: data.balances && typeof data.balances === 'object' ? data.balances : {},
       account: data.account || null,
+      profile: data.profile || null,
     };
   } catch {
     return null;
@@ -374,6 +377,64 @@ async function ensureWalletResetSynced() {
   const resetAt = await fetchWalletResetAt();
   if (!resetAt) return;
   await applyServerWalletReset(resetAt);
+}
+
+function loadProfileSyncAck(username) {
+  if (!username) return 0;
+  try {
+    const raw = localStorage.getItem(PROFILE_SYNC_ACK_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return Math.max(0, parseInt(parsed[username.toLowerCase()], 10) || 0);
+  } catch {
+    return 0;
+  }
+}
+
+function saveProfileSyncAck(username, updatedAt) {
+  if (!username) return;
+  try {
+    const raw = localStorage.getItem(PROFILE_SYNC_ACK_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    parsed[username.toLowerCase()] = Math.max(0, parseInt(updatedAt, 10) || 0);
+    localStorage.setItem(PROFILE_SYNC_ACK_KEY, JSON.stringify(parsed));
+  } catch {
+    /* ignore */
+  }
+}
+
+function applyServerProfile(profile, username) {
+  if (!profile || !username) return false;
+  const updatedAt = Math.max(0, parseInt(profile.updatedAt, 10) || 0);
+  if (!updatedAt || updatedAt <= loadProfileSyncAck(username)) return false;
+
+  let changed = false;
+
+  if (profile.wagered != null) {
+    const wagered = Math.max(0, parseFloat(profile.wagered) || 0);
+    const stats = loadProfileStats();
+    if (stats.wagered !== wagered) {
+      stats.wagered = wagered;
+      localStorage.setItem(PROFILE_STATS_KEY, JSON.stringify(stats));
+      changed = true;
+    }
+  }
+
+  if (profile.rakebackResetAt) {
+    const rakeData = loadRakeback();
+    rakeData.pending = 0;
+    rakeData.syncedWagered = loadProfileStats().wagered;
+    saveRakeback(rakeData);
+    changed = true;
+  }
+
+  saveProfileSyncAck(username, updatedAt);
+  if (changed) {
+    document.dispatchEvent(new CustomEvent('xython:stats-change', { detail: loadProfileStats() }));
+    renderAuthUI();
+    updateRewardsDot();
+    if (typeof refreshRewardsPopout === 'function') refreshRewardsPopout();
+  }
+  return changed;
 }
 
 async function syncWalletGrantsFromServer() {

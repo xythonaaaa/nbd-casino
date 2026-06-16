@@ -375,6 +375,38 @@
   margin-left: 6px;
 }
 
+.bj-player-hands {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.bj-hand-slot {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.bj-hand-slot.is-active {
+  border-color: rgba(167, 139, 250, 0.55);
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.bj-hand-slot.is-done:not(.is-active) {
+  opacity: 0.72;
+}
+
+.bj-hand-slot-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
 .bj-cards {
   display: flex;
   justify-content: center;

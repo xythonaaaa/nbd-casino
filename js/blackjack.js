@@ -8,13 +8,13 @@ let popupTimer = null;
 
 const state = {
   deck: [],
-  player: [],
   dealer: [],
-  bet: 0,
+  hands: [],
+  activeHandIndex: 0,
+  splitUsed: false,
   sideBets: { perfectPairs: 0, twentyOnePlus3: 0 },
   tab: 'standard',
   phase: 'idle',
-  doubled: false,
   busy: false,
 };
 
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   els.placeBet = document.getElementById('bjPlaceBet');
   els.message = document.getElementById('bjMessage');
   els.dealerCards = document.getElementById('bjDealerCards');
-  els.playerCards = document.getElementById('bjPlayerCards');
+  els.playerHands = document.getElementById('bjPlayerHands');
   els.dealerScore = document.getElementById('bjDealerScore');
   els.playerScore = document.getElementById('bjPlayerScore');
   els.rules = document.getElementById('bjRules');
@@ -71,6 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
   els.placeBet.addEventListener('click', () => placeBet());
   els.hit.addEventListener('click', () => hit());
   els.stand.addEventListener('click', () => stand());
+  els.split.addEventListener('click', () => splitHand());
   els.doubleDown.addEventListener('click', () => doubleDown());
 
   document.addEventListener('xython:auth-change', updateUI);
@@ -158,6 +159,38 @@ function isBlackjack(hand) {
   return hand.length === 2 && handValue(hand) === 21;
 }
 
+function createHand(bet) {
+  return { cards: [], bet, doubled: false, done: false, splitAce: false };
+}
+
+function getActiveHand() {
+  return state.hands[state.activeHandIndex] || null;
+}
+
+function getMainHand() {
+  return state.hands[0] || null;
+}
+
+function canSplitPair(cards) {
+  if (cards.length !== 2) return false;
+  if (cards[0].rank === cards[1].rank) return true;
+  return cardValue(cards[0]) === 10 && cardValue(cards[1]) === 10;
+}
+
+function canSplit() {
+  if (state.phase !== 'playing' || state.busy || state.splitUsed) return false;
+  const hand = getActiveHand();
+  if (!hand || hand.done || hand.cards.length !== 2 || hand.doubled) return false;
+  if (!canSplitPair(hand.cards)) return false;
+  const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
+  const balance = window.XythonWallet?.getBalance(currency) ?? 0;
+  return hand.bet > 0 && hand.bet <= balance;
+}
+
+function totalMainWager() {
+  return state.hands.reduce((sum, hand) => sum + hand.bet, 0);
+}
+
 function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -172,19 +205,52 @@ function renderCard(card, hidden = false) {
 }
 
 function clearTable() {
-  state.player = [];
+  state.hands = [];
+  state.activeHandIndex = 0;
+  state.splitUsed = false;
   state.dealer = [];
   els.dealerCards.innerHTML = '';
-  els.playerCards.innerHTML = '';
+  if (els.playerHands) els.playerHands.innerHTML = '';
   els.dealerScore.textContent = '';
   els.playerScore.textContent = '';
   els.rules.classList.remove('hidden');
 }
 
-function appendPlayerCard(card) {
-  state.player.push(card);
-  els.playerCards.appendChild(renderCard(card));
-  els.playerScore.textContent = handValueDisplay(state.player);
+function renderPlayerHands() {
+  if (!els.playerHands) return;
+  els.playerHands.innerHTML = '';
+
+  state.hands.forEach((hand, index) => {
+    const slot = document.createElement('div');
+    slot.className = 'bj-hand-slot';
+    if (index === state.activeHandIndex && state.phase === 'playing' && !hand.done) {
+      slot.classList.add('is-active');
+    }
+    if (hand.done) slot.classList.add('is-done');
+
+    if (state.hands.length > 1) {
+      const label = document.createElement('div');
+      label.className = 'bj-hand-slot-label';
+      label.textContent = `Hand ${index + 1} · $${hand.bet.toFixed(2)}`;
+      slot.appendChild(label);
+    }
+
+    const cardsEl = document.createElement('div');
+    cardsEl.className = 'bj-cards';
+    hand.cards.forEach(card => cardsEl.appendChild(renderCard(card)));
+    slot.appendChild(cardsEl);
+    els.playerHands.appendChild(slot);
+  });
+
+  const active = getActiveHand();
+  els.playerScore.textContent = active?.cards.length ? handValueDisplay(active.cards) : '';
+}
+
+function appendPlayerCard(card, handIndex = state.activeHandIndex) {
+  const hand = state.hands[handIndex];
+  if (!hand) return;
+  hand.cards.push(card);
+  renderPlayerHands();
   els.rules.classList.add('hidden');
 }
 
@@ -336,7 +402,9 @@ function resolveSideBets() {
   let totalSidePayout = 0;
 
   if (state.sideBets.perfectPairs > 0) {
-    const result = evaluatePerfectPairs(state.player[0], state.player[1]);
+    const main = getMainHand();
+    if (!main || main.cards.length < 2) return { wins, totalSidePayout };
+    const result = evaluatePerfectPairs(main.cards[0], main.cards[1]);
     if (result) {
       const payout = paySideBet(state.sideBets.perfectPairs, result, currency);
       totalSidePayout += payout;
@@ -345,7 +413,9 @@ function resolveSideBets() {
   }
 
   if (state.sideBets.twentyOnePlus3 > 0) {
-    const result = evaluate21Plus3(state.player[0], state.player[1], state.dealer[0]);
+    const main = getMainHand();
+    if (!main || main.cards.length < 2) return { wins, totalSidePayout };
+    const result = evaluate21Plus3(main.cards[0], main.cards[1], state.dealer[0]);
     if (result) {
       const payout = paySideBet(state.sideBets.twentyOnePlus3, result, currency);
       totalSidePayout += payout;
@@ -360,11 +430,12 @@ function updateUI() {
   const playing = state.phase === 'playing' && !state.busy;
   const locked = state.busy || state.phase === 'dealing' || state.phase === 'dealer';
   const loggedIn = window.XythonAuth?.isLoggedIn?.() ?? false;
+  const activeHand = getActiveHand();
   els.placeBet.textContent = loggedIn ? 'Place Bet' : 'Register to Bet';
-  els.hit.disabled = !playing;
-  els.stand.disabled = !playing;
-  els.doubleDown.disabled = !(playing && state.player.length === 2 && !state.doubled);
-  els.split.disabled = true;
+  els.hit.disabled = !playing || !activeHand || activeHand.done;
+  els.stand.disabled = !playing || !activeHand || activeHand.done;
+  els.doubleDown.disabled = !(playing && activeHand && activeHand.cards.length === 2 && !activeHand.doubled && !activeHand.done);
+  els.split.disabled = !canSplit();
   els.placeBet.disabled = locked || state.phase === 'playing' || state.phase === 'dealer';
   els.bet.disabled = locked || state.phase === 'playing' || state.phase === 'dealer';
   els.half.disabled = locked || state.phase === 'playing';
@@ -416,9 +487,10 @@ async function placeBet() {
     return;
   }
 
-  state.bet = bet;
+  state.hands = [createHand(bet)];
+  state.activeHandIndex = 0;
+  state.splitUsed = false;
   state.sideBets = sideBets;
-  state.doubled = false;
   state.deck = shuffle(createDeck());
   state.phase = 'dealing';
   state.busy = true;
@@ -446,7 +518,7 @@ async function placeBet() {
   state.busy = false;
   updateUI();
 
-  if (isBlackjack(state.player)) {
+  if (isBlackjack(getMainHand()?.cards || [])) {
     state.busy = true;
     updateUI();
     await wait(500);
@@ -462,6 +534,8 @@ async function placeBet() {
 
 async function hit() {
   if (state.phase !== 'playing' || state.busy) return;
+  const hand = getActiveHand();
+  if (!hand || hand.done) return;
   state.busy = true;
   updateUI();
 
@@ -469,9 +543,9 @@ async function hit() {
   appendPlayerCard(draw());
   await wait(DEAL_DELAY);
 
-  if (handValue(state.player) > 21) {
-    await revealDealerHoleCard();
-    finishRound('lose', 'Bust — you lose');
+  if (handValue(hand.cards) > 21) {
+    hand.done = true;
+    await advanceToNextHand();
     return;
   }
   state.busy = false;
@@ -480,44 +554,126 @@ async function hit() {
 
 async function stand() {
   if (state.phase !== 'playing' || state.busy) return;
+  const hand = getActiveHand();
+  if (!hand || hand.done) return;
+  state.busy = true;
+  hand.done = true;
+  updateUI();
+  await advanceToNextHand();
+}
+
+async function splitHand() {
+  if (!canSplit()) return;
+
+  const hand = getActiveHand();
+  const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
+  const balance = window.XythonWallet?.getBalance(currency) ?? 0;
+  const splitBet = hand.bet;
+
+  state.busy = true;
+  updateUI();
+
+  const debitResult = window.XythonWallet?.setBalance(currency, balance - splitBet, {
+    type: 'bet',
+    label: 'Blackjack',
+    detail: `Split — $${splitBet.toFixed(2)}`,
+    game: 'blackjack',
+  });
+  if (debitResult?.ok === false) {
+    state.busy = false;
+    updateUI();
+    setMessage(debitResult.error, 'lose');
+    return;
+  }
+
+  const card0 = hand.cards[0];
+  const card1 = hand.cards[1];
+  const isAces = card0.rank === 'A';
+
+  state.hands = [
+    { cards: [card0], bet: splitBet, doubled: false, done: false, splitAce: isAces },
+    { cards: [card1], bet: splitBet, doubled: false, done: false, splitAce: isAces },
+  ];
+  state.activeHandIndex = 0;
+  state.splitUsed = true;
+  renderPlayerHands();
+
+  await wait(300);
+  appendPlayerCard(draw(), 0);
+  await wait(DEAL_DELAY);
+  appendPlayerCard(draw(), 1);
+  await wait(DEAL_DELAY);
+
+  if (isAces) {
+    state.hands.forEach(h => { h.done = true; });
+    await dealerTurn();
+    return;
+  }
+
+  if (handValue(state.hands[0].cards) > 21) state.hands[0].done = true;
+  if (handValue(state.hands[1].cards) > 21) state.hands[1].done = true;
+
+  if (state.hands.every(h => h.done)) {
+    await advanceToNextHand();
+    return;
+  }
+
+  state.activeHandIndex = state.hands.findIndex(h => !h.done);
+  state.busy = false;
+  updateUI();
+}
+
+async function advanceToNextHand() {
+  renderPlayerHands();
+  const nextIndex = state.hands.findIndex((hand, index) => !hand.done && index > state.activeHandIndex);
+  if (nextIndex >= 0) {
+    state.activeHandIndex = nextIndex;
+    state.busy = false;
+    updateUI();
+    return;
+  }
+
   await dealerTurn();
 }
 
 async function doubleDown() {
-  if (state.phase !== 'playing' || state.busy || state.player.length !== 2 || state.doubled) return;
+  const hand = getActiveHand();
+  if (state.phase !== 'playing' || state.busy || !hand || hand.cards.length !== 2 || hand.doubled || hand.done) return;
 
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
   const balance = window.XythonWallet?.getBalance(currency) ?? 0;
-  if (state.bet > balance) {
+  if (hand.bet > balance) {
     setMessage('Insufficient balance to double', 'lose');
     return;
   }
 
   state.busy = true;
   updateUI();
-  const debitResult = window.XythonWallet?.setBalance(currency, balance - state.bet, {
+  const debitResult = window.XythonWallet?.setBalance(currency, balance - hand.bet, {
     type: 'bet',
     label: 'Blackjack',
-    detail: `Double down — $${state.bet.toFixed(2)}`,
+    detail: `Double down — $${hand.bet.toFixed(2)}`,
     game: 'blackjack',
   });
   if (debitResult?.ok === false) {
+    state.busy = false;
+    updateUI();
     setMessage(debitResult.error, 'lose');
     return;
   }
-  state.bet *= 2;
-  state.doubled = true;
+  hand.bet *= 2;
+  hand.doubled = true;
 
   await wait(300);
   appendPlayerCard(draw());
   await wait(DEAL_DELAY);
 
-  if (handValue(state.player) > 21) {
-    await revealDealerHoleCard();
-    finishRound('lose', 'Bust — you lose');
+  hand.done = true;
+  if (handValue(hand.cards) > 21) {
+    await advanceToNextHand();
     return;
   }
-  await dealerTurn();
+  await advanceToNextHand();
 }
 
 async function dealerTurn() {
@@ -534,14 +690,87 @@ async function dealerTurn() {
     await wait(DEAL_DELAY);
   }
 
-  const p = handValue(state.player);
-  const d = handValue(state.dealer);
+  finishHands();
+  updateUI();
+}
 
-  if (d > 21) finishRound('win', 'Dealer bust — you win!');
-  else if (p > d) finishRound('win', 'You win!');
-  else if (p < d) finishRound('lose', 'Dealer wins');
-  else finishRound('push', 'Push');
+function resolveHandResult(hand, dealerTotal) {
+  const playerTotal = handValue(hand.cards);
+  const wager = hand.bet;
 
+  if (playerTotal > 21) return { result: 'lose', payout: 0, wager };
+  if (dealerTotal > 21) return { result: 'win', payout: wager * 2, wager };
+  if (playerTotal > dealerTotal) return { result: 'win', payout: wager * 2, wager };
+  if (playerTotal < dealerTotal) return { result: 'lose', payout: 0, wager };
+  return { result: 'push', payout: wager, wager };
+}
+
+function finishHands() {
+  state.phase = 'idle';
+  state.busy = false;
+  updateDealerScore(false);
+  renderPlayerHands();
+
+  const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
+  const dealerTotal = handValue(state.dealer);
+  const outcomes = state.hands.map((hand, index) => ({
+    index,
+    ...resolveHandResult(hand, dealerTotal),
+  }));
+
+  const totalWager = outcomes.reduce((sum, item) => sum + item.wager, 0);
+  const totalPayout = outcomes.reduce((sum, item) => sum + item.payout, 0);
+  const wins = outcomes.filter(item => item.result === 'win').length;
+  const losses = outcomes.filter(item => item.result === 'lose').length;
+  const pushes = outcomes.filter(item => item.result === 'push').length;
+
+  let result = 'push';
+  if (wins && !losses) result = 'win';
+  else if (losses && !wins && !pushes) result = 'lose';
+  else if (totalPayout > totalWager) result = 'win';
+  else if (totalPayout < totalWager) result = 'lose';
+
+  if (state.hands.length > 1) {
+    const parts = outcomes.map(item => {
+      const label = item.result === 'win' ? 'Win' : item.result === 'lose' ? 'Loss' : 'Push';
+      return `Hand ${item.index + 1}: ${label}`;
+    });
+    const summary = `${wins}W-${losses}L${pushes ? `-${pushes}P` : ''}`;
+    if (totalPayout > totalWager) {
+      setMessage(`${summary} · ${parts.join(' • ')} · +$${(totalPayout - totalWager).toFixed(2)}`, 'win');
+    } else if (totalPayout < totalWager) {
+      setMessage(`${summary} · ${parts.join(' • ')} · -$${(totalWager - totalPayout).toFixed(2)}`, 'lose');
+    } else {
+      setMessage(`${summary} · ${parts.join(' • ')}`, 'push');
+    }
+  } else {
+    const single = outcomes[0];
+    if (single.result === 'win') setMessage(`You win $${single.payout.toFixed(2)}`, 'win');
+    else if (single.result === 'push') setMessage('Push — bet returned', 'push');
+    else setMessage('You lose', 'lose');
+  }
+
+  showResultPopup(result, totalPayout, totalWager);
+
+  if (totalPayout > 0) {
+    const balance = window.XythonWallet?.getBalance(currency) ?? 0;
+    window.XythonWallet?.setBalance(currency, balance + totalPayout, {
+      type: 'win',
+      label: 'Blackjack',
+      detail: result === 'push'
+        ? `Push — $${totalPayout.toFixed(2)} returned`
+        : `Win — $${totalPayout.toFixed(2)}`,
+      game: 'blackjack',
+    });
+  }
+
+  const sideWager = (state.sideBets?.perfectPairs || 0) + (state.sideBets?.twentyOnePlus3 || 0);
+  const allWager = totalWager + sideWager;
+  const won = totalPayout > totalWager ? true : totalPayout < totalWager ? false : null;
+  window.XythonStats?.recordRound?.(allWager, won, { game: 'blackjack', payout: totalPayout });
+
+  state.hands = [];
+  state.sideBets = { perfectPairs: 0, twentyOnePlus3: 0 };
   updateUI();
 }
 
@@ -549,10 +778,11 @@ function finishRound(result, msg) {
   state.phase = 'idle';
   state.busy = false;
   updateDealerScore(false);
-  els.playerScore.textContent = handValueDisplay(state.player) || '';
+  renderPlayerHands();
 
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
-  const wager = state.bet;
+  const hand = getMainHand();
+  const wager = hand?.bet || 0;
   let payout = 0;
 
   if (result === 'blackjack') {
@@ -583,9 +813,8 @@ function finishRound(result, msg) {
     });
   }
 
-  const totalWager = state.bet
-    + (state.sideBets?.perfectPairs || 0)
-    + (state.sideBets?.twentyOnePlus3 || 0);
+  const sideWager = (state.sideBets?.perfectPairs || 0) + (state.sideBets?.twentyOnePlus3 || 0);
+  const totalWager = wager + sideWager;
   const won = result === 'blackjack' || result === 'win'
     ? true
     : result === 'lose'
@@ -593,7 +822,7 @@ function finishRound(result, msg) {
       : null;
   window.XythonStats?.recordRound?.(totalWager, won, { game: 'blackjack', payout });
 
-  state.bet = 0;
+  state.hands = [];
   state.sideBets = { perfectPairs: 0, twentyOnePlus3: 0 };
   updateUI();
 }

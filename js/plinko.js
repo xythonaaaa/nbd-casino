@@ -261,7 +261,18 @@ function drawBall(ctx, ball, pegRadius) {
   ctx.stroke();
 }
 
-function buildPath(rows) {
+function buildPathForSlot(rows, slotIndex) {
+  const ones = Math.min(rows, Math.max(0, slotIndex));
+  const path = [...Array(ones).fill(1), ...Array(rows - ones).fill(0)];
+  for (let i = path.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [path[i], path[j]] = [path[j], path[i]];
+  }
+  return path;
+}
+
+function buildPath(rows, forcedPath) {
+  if (Array.isArray(forcedPath) && forcedPath.length === rows) return forcedPath.slice();
   const path = [];
   for (let i = 0; i < rows; i++) {
     path.push(Math.random() < 0.5 ? 0 : 1);
@@ -328,13 +339,6 @@ function updateBall(ball, dt) {
 function completeBall(ball) {
   ball.paid = true;
   const payout = ball.bet * ball.multiplier;
-  const balance = window.XythonWallet?.getBalance(ball.currency) ?? 0;
-  window.XythonWallet?.setBalance(ball.currency, balance + payout, {
-    type: 'win',
-    label: 'Plinko',
-    detail: `${formatMultiplier(ball.multiplier)}x — $${payout.toFixed(2)}`,
-    game: 'plinko',
-  });
 
   flashBucket(ball.slotIndex);
   addHistoryEntry(ball);
@@ -448,9 +452,12 @@ function startAnimationLoop() {
   requestAnimationFrame(animationFrame);
 }
 
-function dropBall(bet, currency) {
-  const path = buildPath(state.rows);
+function dropBall(bet, currency, serverOutcome) {
+  const path = serverOutcome?.path
+    ? buildPath(state.rows, serverOutcome.path)
+    : buildPath(state.rows);
   const { points, slotIndex } = getBallWaypoints(path);
+  const multiplier = serverOutcome?.multiplier ?? state.multipliers[slotIndex];
 
   state.balls.push({
     id: ++state.ballId,
@@ -459,12 +466,12 @@ function dropBall(bet, currency) {
     points,
     segment: 0,
     segmentTime: 0,
-    slotIndex,
-    multiplier: state.multipliers[slotIndex],
+    slotIndex: serverOutcome?.slotIndex ?? slotIndex,
+    multiplier,
     bet,
     currency,
     finished: false,
-    paid: false,
+    paid: true,
   });
 
   startAnimationLoop();
@@ -488,7 +495,7 @@ function updateUI() {
   els.risk.disabled = ballsActive;
 }
 
-function placeBet() {
+async function placeBet() {
   if (!window.XythonAuth?.requireAuth?.('register')) {
     setMessage('Register to place bets', 'lose');
     return;
@@ -511,13 +518,23 @@ function placeBet() {
     rebuildBoard();
   }
 
-  const debitResult = window.XythonWallet?.setBalance(currency, balance - bet, {
-    type: 'bet',
-    label: 'Plinko',
-    detail: `Bet $${bet.toFixed(2)}`,
+  const play = await window.XythonWallet?.playRound?.({
     game: 'plinko',
+    bet,
+    currency,
+    params: { rows: state.rows, risk: state.risk },
+    tx: {
+      label: 'Plinko',
+      detail: `Bet $${bet.toFixed(2)}`,
+      game: 'plinko',
+    },
   });
-  if (debitResult?.ok === false) return;
-  dropBall(bet, currency);
+
+  if (!play?.ok) {
+    setMessage(play?.error || 'Could not place bet', 'lose');
+    return;
+  }
+
+  dropBall(bet, currency, play.outcome);
   updateUI();
 }

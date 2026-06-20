@@ -15,6 +15,7 @@ const state = {
   startTime: 0,
   rafId: 0,
   cashedOut: false,
+  sessionId: null,
   history: [],
   auto: {
     running: false,
@@ -344,18 +345,24 @@ async function startRound() {
 }
 
 async function launchRound(bet, currency) {
-  const debitResult = window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
-    type: 'bet',
-    label: 'Crash',
-    detail: `Bet $${bet.toFixed(2)}`,
+  const started = await window.XythonWallet?.startSession?.({
     game: 'crash',
+    bet,
+    currency,
+    params: {},
+    tx: {
+      label: 'Crash',
+      detail: `Bet $${bet.toFixed(2)}`,
+      game: 'crash',
+    },
   });
-  if (debitResult?.ok === false) return { error: debitResult.error };
+  if (!started?.ok) return { error: started?.error || 'Could not start round' };
 
   state.phase = 'countdown';
   state.bet = bet;
   state.currency = currency;
-  state.crashPoint = generateCrashPoint();
+  state.sessionId = started.sessionId;
+  state.crashPoint = started.clientState?.crashPoint || generateCrashPoint();
   state.multiplier = 1;
   state.cashedOut = false;
   state.startTime = 0;
@@ -412,22 +419,35 @@ async function launchRound(bet, currency) {
 }
 
 function cashOut(auto = false) {
-  if (state.phase !== 'flying' || state.cashedOut) return;
+  if (state.phase !== 'flying' || state.cashedOut || !state.sessionId) return;
 
   state.cashedOut = true;
   stopAnimation();
 
   const mult = state.multiplier;
-  const payout = state.bet * mult;
-  const currency = state.currency;
+  void finishCashOut(mult, auto);
+}
 
-  window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) + payout, {
-    type: 'win',
-    label: 'Crash',
-    detail: `${mult.toFixed(2)}x — $${payout.toFixed(2)}`,
-    game: 'crash',
+async function finishCashOut(mult, auto = false) {
+  const result = await window.XythonWallet?.actSession?.({
+    sessionId: state.sessionId,
+    act: 'cashout',
+    params: { multiplier: mult },
+    tx: {
+      label: 'Crash',
+      game: 'crash',
+      detail: `${mult.toFixed(2)}x cashout`,
+    },
   });
+  state.sessionId = null;
 
+  if (!result?.ok) {
+    setMessage(result?.error || 'Cashout failed', 'lose');
+    finishRound();
+    return;
+  }
+
+  const payout = result.payout;
   window.XythonStats?.recordRound?.(state.bet, true, { game: 'crash', payout });
 
   els.stage.classList.remove('is-flying');
@@ -442,9 +462,17 @@ function cashOut(auto = false) {
   finishRound();
 }
 
-function handleCrash() {
+async function handleCrash() {
   if (state.cashedOut) return;
   stopAnimation();
+
+  if (state.sessionId) {
+    await window.XythonWallet?.actSession?.({
+      sessionId: state.sessionId,
+      act: 'crash',
+    });
+    state.sessionId = null;
+  }
 
   state.phase = 'ended';
   window.XythonStats?.recordRound?.(state.bet, false, { game: 'crash', payout: 0 });
@@ -472,6 +500,7 @@ function resetRound() {
   state.bet = 0;
   state.multiplier = 1;
   state.cashedOut = false;
+  state.sessionId = null;
   state.crashPoint = 1;
 
   els.stage.classList.remove('is-countdown', 'is-flying', 'is-crashed', 'is-cashed');

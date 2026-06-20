@@ -386,13 +386,18 @@ async function playRound({ fast = false, silent = false } = {}) {
   const drawDelay = fast ? DRAW_DELAY_FAST_MS : DRAW_DELAY_MS;
   const resetDelay = fast ? RESET_FAST_MS : RESET_MS;
 
-  const debitResult = window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
-    type: 'bet',
-    label: 'Keno',
-    detail: `Bet $${bet.toFixed(2)} — ${picks.size} spots`,
+  const play = await window.XythonWallet?.playRound?.({
     game: 'keno',
+    bet,
+    currency,
+    params: { picks: [...picks] },
+    tx: {
+      label: 'Keno',
+      detail: `Bet $${bet.toFixed(2)} — ${picks.size} spots`,
+      game: 'keno',
+    },
   });
-  if (debitResult?.ok === false) return { error: debitResult.error };
+  if (!play?.ok) return { error: play?.error || 'Could not place bet' };
 
   state.phase = 'drawing';
   state.bet = bet;
@@ -404,7 +409,7 @@ async function playRound({ fast = false, silent = false } = {}) {
   updateUI();
   renderGrid();
 
-  const drawOrder = drawNumbers();
+  const drawOrder = play.outcome.drawn;
 
   for (let i = 0; i < drawOrder.length; i++) {
     const num = drawOrder[i];
@@ -415,20 +420,11 @@ async function playRound({ fast = false, silent = false } = {}) {
     if (i < drawOrder.length - 1) await delay(drawDelay);
   }
 
-  const mult = getMultiplier(picks.size, state.hits);
-  const payout = bet * mult;
-  const won = mult > 0;
+  const mult = play.outcome.multiplier;
+  const payout = play.payout;
+  const won = play.outcome.won;
   const netProfit = won ? payout - bet : -bet;
-  const hits = state.hits;
-
-  if (won) {
-    window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) + payout, {
-      type: 'win',
-      label: 'Keno',
-      detail: `${state.hits} hits — ${mult.toFixed(2)}x ($${payout.toFixed(2)})`,
-      game: 'keno',
-    });
-  }
+  const hits = play.outcome.hits;
 
   window.XythonStats?.recordRound?.(bet, won, { game: 'keno', payout });
 

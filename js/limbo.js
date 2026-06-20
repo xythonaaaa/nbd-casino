@@ -304,13 +304,18 @@ async function playRound({ fast = false, silent = false } = {}) {
 
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
 
-  const debitResult = window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
-    type: 'bet',
-    label: 'Limbo',
-    detail: `Bet $${bet.toFixed(2)} @ ${target.toFixed(2)}x`,
+  const play = await window.XythonWallet?.playRound?.({
     game: 'limbo',
+    bet,
+    currency,
+    params: { target },
+    tx: {
+      label: 'Limbo',
+      detail: `Bet $${bet.toFixed(2)} @ ${target.toFixed(2)}x`,
+      game: 'limbo',
+    },
   });
-  if (debitResult?.ok === false) return { error: debitResult.error };
+  if (!play?.ok) return { error: play?.error || 'Could not place bet' };
 
   state.phase = 'rolling';
   hideResultPopup();
@@ -320,9 +325,9 @@ async function playRound({ fast = false, silent = false } = {}) {
   if (!silent) setMessage('Rolling…', '');
   updateUI();
 
-  const finalResult = generateResult();
-  const won = finalResult >= target;
-  const payout = won ? bet * target : 0;
+  const finalResult = play.outcome.result;
+  const won = play.outcome.won;
+  const payout = play.payout;
   const netProfit = won ? payout - bet : -bet;
 
   await animateResult(finalResult, fast);
@@ -332,12 +337,6 @@ async function playRound({ fast = false, silent = false } = {}) {
   els.result.classList.add(won ? 'lb-result--win' : 'lb-result--lose');
 
   if (won) {
-    window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) + payout, {
-      type: 'win',
-      label: 'Limbo',
-      detail: `${finalResult.toFixed(2)}x ≥ ${target.toFixed(2)}x — $${payout.toFixed(2)}`,
-      game: 'limbo',
-    });
     els.status.textContent = `Win — ${finalResult.toFixed(2)}x beat ${target.toFixed(2)}x`;
     if (!silent && !fast) setMessage(`Won $${payout.toFixed(2)} at ${target.toFixed(2)}x`, 'win');
   } else {

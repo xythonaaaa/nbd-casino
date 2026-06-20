@@ -396,29 +396,31 @@ async function spin() {
   setMessage('');
   updateUI();
 
-  const debitResult = window.XythonWallet?.setBalance(currency, balance - bet, {
-    type: 'bet',
-    game: 'Wheel',
-    amount: bet,
+  const play = await window.XythonWallet?.playRound?.({
+    game: 'wheel',
+    bet,
+    currency,
+    params: { risk: state.risk },
+    tx: {
+      label: 'Wheel',
+      game: 'wheel',
+    },
   });
-  if (debitResult?.ok === false) return;
+  if (!play?.ok) {
+    state.spinning = false;
+    setMessage(play?.error || 'Could not place bet.', 'loss');
+    updateUI();
+    return;
+  }
 
-  const winIndex = pickSliceIndex();
+  const winIndex = play.outcome.index;
   const slice = getSlices()[winIndex];
 
   await spinToIndex(winIndex);
 
-  const effectiveMult = slice.mult > 0 ? slice.mult * HOUSE_EDGE : 0;
-  const payout = bet * effectiveMult;
+  const effectiveMult = play.outcome.effectiveMult;
+  const payout = play.payout;
   const profit = payout - bet;
-
-  if (payout > 0) {
-    window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) + payout, {
-      type: 'win',
-      game: 'Wheel',
-      amount: payout,
-    });
-  }
 
   window.XythonStats?.recordRound?.(bet, profit > 0, { game: 'wheel', payout });
 

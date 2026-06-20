@@ -28,11 +28,173 @@ function canDeposit() {
 const GRANTS_SYNC_KEY = 'xython-grants-synced';
 const WALLET_RESET_ACK_KEY = 'xython-wallet-reset-ack';
 const PROFILE_SYNC_ACK_KEY = 'xython-profile-sync';
-const WALLET_GRANTS_POLL_MS = 8000;
+const WALLET_GRANTS_POLL_MS = 3000;
 const WALLET_CURRENCIES = ['USD', 'BTC', 'ETH', 'LTC'];
 
 let walletGrantsPollTimer = null;
 let cachedAccountStatus = null;
+let walletMutationAllowed = false;
+
+function usesServerWallet() {
+  return !!getWalletApiUrl() && isLoggedIn();
+}
+
+function applyServerWalletFromResponse(data) {
+  if (!data) return;
+  walletMutationAllowed = true;
+  const grants = data.grants || {};
+  const balances = data.balances || {};
+  WALLET_CURRENCIES.forEach(currency => {
+    const total = data.combined?.[currency] ?? getCombinedServerTotal(grants, balances, currency);
+    setWalletBalance(currency, total, false);
+  });
+  saveWalletState();
+  const username = getLoggedInUsername();
+  if (username) markServerWalletSynced(username, grants, balances);
+  walletMutationAllowed = false;
+}
+
+async function serverPlayRound({ game, bet, currency, params, tx }) {
+  const username = getLoggedInUsername();
+  if (!username) return { ok: false, error: 'Log in to continue' };
+  if (!getWalletApiUrl()) return { ok: false, error: 'Server wallet unavailable' };
+
+  const block = getBetBlockReason();
+  if (block) return { ok: false, error: block };
+
+  const amt = parseFloat(bet);
+  if (!amt || amt <= 0) return { ok: false, error: 'Invalid bet amount' };
+
+  const cur = currency || window.XythonWallet?.getActiveCurrency?.() || 'USD';
+  const result = await postWalletAction({
+    action: 'play',
+    username,
+    game,
+    bet: amt,
+    currency: cur,
+    params: params || {},
+  });
+
+  if (!result?.ok) {
+    return { ok: false, error: result?.data?.error || 'Could not place bet' };
+  }
+
+  applyServerWalletFromResponse(result.data);
+
+  if (tx) {
+    const payout = parseFloat(result.data.payout) || 0;
+    recordTransaction({
+      type: 'bet',
+      amount: -amt,
+      currency: cur,
+      label: tx.label || game,
+      detail: tx.detail || `Bet $${amt.toFixed(2)}`,
+      game: tx.game || game,
+    });
+    if (payout > 0) {
+      recordTransaction({
+        type: 'win',
+        amount: payout,
+        currency: cur,
+        label: tx.label || game,
+        detail: tx.winDetail || `Won $${payout.toFixed(2)}`,
+        game: tx.game || game,
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    outcome: result.data.outcome,
+    payout: result.data.payout,
+    bet: amt,
+  };
+}
+
+async function serverStartSession({ game, bet, currency, params, tx }) {
+  const username = getLoggedInUsername();
+  if (!username) return { ok: false, error: 'Log in to continue' };
+  if (!getWalletApiUrl()) return { ok: false, error: 'Server wallet unavailable' };
+
+  const block = getBetBlockReason();
+  if (block) return { ok: false, error: block };
+
+  const amt = parseFloat(bet);
+  if (!amt || amt <= 0) return { ok: false, error: 'Invalid bet amount' };
+
+  const cur = currency || window.XythonWallet?.getActiveCurrency?.() || 'USD';
+  const result = await postWalletAction({
+    action: 'session-start',
+    username,
+    game,
+    bet: amt,
+    currency: cur,
+    params: params || {},
+  });
+
+  if (!result?.ok) {
+    return { ok: false, error: result?.data?.error || 'Could not start round' };
+  }
+
+  applyServerWalletFromResponse(result.data);
+
+  if (tx) {
+    recordTransaction({
+      type: 'bet',
+      amount: -amt,
+      currency: cur,
+      label: tx.label || game,
+      detail: tx.detail || `Bet $${amt.toFixed(2)}`,
+      game: tx.game || game,
+    });
+  }
+
+  return {
+    ok: true,
+    sessionId: result.data.sessionId,
+    bet: amt,
+    clientState: result.data.clientState || null,
+  };
+}
+
+async function serverActSession({ sessionId, act, params, tx }) {
+  const username = getLoggedInUsername();
+  if (!username) return { ok: false, error: 'Log in to continue' };
+  if (!getWalletApiUrl()) return { ok: false, error: 'Server wallet unavailable' };
+
+  const result = await postWalletAction({
+    action: 'session-act',
+    username,
+    sessionId,
+    act,
+    params: params || {},
+  });
+
+  if (!result?.ok) {
+    return { ok: false, error: result?.data?.error || 'Could not update round' };
+  }
+
+  applyServerWalletFromResponse(result.data);
+
+  const payout = parseFloat(result.data.payout) || 0;
+  if (payout > 0 && tx) {
+    recordTransaction({
+      type: 'win',
+      amount: payout,
+      currency: window.XythonWallet?.getActiveCurrency?.() || 'USD',
+      label: tx.label || 'Game',
+      detail: tx.detail || `Won $${payout.toFixed(2)}`,
+      game: tx.game,
+    });
+  }
+
+  return {
+    ok: true,
+    done: !!result.data.done,
+    payout,
+    outcome: result.data.outcome,
+  };
+}
 
 function getWalletApiUrl() {
   if (window.NBD_WALLET_API) return window.NBD_WALLET_API;
@@ -444,27 +606,18 @@ async function syncWalletGrantsFromServer() {
   const serverWallet = await fetchServerGrants(username);
   if (!serverWallet) return;
 
-  const { grants: serverGrants, balances: serverBalances } = serverWallet;
-  const synced = loadGrantsSynced();
-  const userKey = username.toLowerCase();
-  if (!synced[userKey]) synced[userKey] = { USD: 0, BTC: 0, ETH: 0, LTC: 0 };
+  if (serverWallet.account) applyAccountStatus(serverWallet.account);
+  if (serverWallet.profile) applyServerProfile(serverWallet.profile, username);
 
+  const { grants: serverGrants, balances: serverBalances } = serverWallet;
+  walletMutationAllowed = true;
   WALLET_CURRENCIES.forEach(currency => {
     const serverTotal = getCombinedServerTotal(serverGrants, serverBalances, currency);
-    const applied = parseFloat(synced[userKey][currency]) || 0;
-    const delta = serverTotal - applied;
-    if (delta <= 0) return;
-
-    const balance = getWalletBalance(currency) + delta;
-    window.XythonWallet?.setBalance?.(currency, balance, {
-      type: 'reward',
-      label: 'Transfer',
-      detail: `Received ${formatWalletDisplay(currency, delta)} ${currency}`,
-    });
-    synced[userKey][currency] = serverTotal;
+    setWalletBalance(currency, serverTotal, false);
   });
-
-  saveGrantsSynced(synced);
+  saveWalletState();
+  markServerWalletSynced(username, serverGrants, serverBalances);
+  walletMutationAllowed = false;
 }
 
 function startWalletGrantsPolling() {
@@ -1203,12 +1356,18 @@ async function executeTip(recipient, amount) {
   }
 
   const data = result.data;
-  window.XythonWallet.setBalance('USD', localBalance - amount, {
+  applyServerWalletFromResponse({
+    grants: data.fromGrants,
+    balances: data.fromBalances,
+  });
+  markServerWalletSynced(sender, data.fromGrants, data.fromBalances);
+  recordTransaction({
     type: 'tip',
+    amount: -amount,
+    currency: 'USD',
     label: 'Tip',
     detail: `Tipped ${data.to} $${amount.toFixed(2)}`,
   });
-  markServerWalletSynced(sender, data.fromGrants, data.fromBalances);
 
   const displaySender = getPublicUsername();
   const tipMsg = `${displaySender} tipped ${data.to} $${amount.toFixed(2)}`;
@@ -3810,6 +3969,7 @@ function getWalletBalance(currency) {
 }
 
 function setWalletBalance(currency, value, persist = true) {
+  if (usesServerWallet() && !walletMutationAllowed) return;
   const formatted = formatWalletAmount(currency, value);
   document.querySelectorAll(`.wallet-option[data-currency="${currency}"]`).forEach(option => {
     option.dataset.amount = formatted;
@@ -3959,11 +4119,18 @@ window.XythonWallet = {
   getBalance(currency) {
     return getWalletBalance(currency || this.getActiveCurrency());
   },
+  usesServerWallet,
+  playRound: serverPlayRound,
+  startSession: serverStartSession,
+  actSession: serverActSession,
   debitBet(currency, bet, tx) {
     const block = getBetBlockReason();
     if (block) {
       showToast(block, 'error');
       return { ok: false, error: block };
+    }
+    if (usesServerWallet()) {
+      return { ok: false, error: 'This game must use server playRound()' };
     }
     const amt = parseFloat(bet);
     if (!amt || amt <= 0) return { ok: false, error: 'Invalid bet amount' };
@@ -3974,6 +4141,9 @@ window.XythonWallet = {
     return { ok: true };
   },
   setBalance(currency, value, tx) {
+    if (usesServerWallet() && !walletMutationAllowed) {
+      return { ok: false, error: 'Balance is managed by the server' };
+    }
     const cur = currency || this.getActiveCurrency();
     const previous = getWalletBalance(cur);
     const delta = value - previous;
@@ -4142,7 +4312,7 @@ function initDepositModal({ getActiveCurrency }) {
     }
   });
 
-  submitBtn.addEventListener('click', () => {
+  submitBtn.addEventListener('click', async () => {
     if (!canDeposit()) return;
     const amount = parseFloat(amountInput.value);
     if (!amount || amount <= 0) {
@@ -4150,18 +4320,35 @@ function initDepositModal({ getActiveCurrency }) {
       return;
     }
 
-    const newBalance = getWalletBalance(selectedCurrency) + amount;
-    setWalletBalance(selectedCurrency, newBalance);
-
-    recordTransaction({
-      type: 'deposit',
-      amount,
-      currency: selectedCurrency,
-      label: 'Deposit',
-      detail: selectedCurrency === 'USD'
-        ? `Deposited $${amount.toFixed(2)}`
-        : `Deposited ${formatWalletDisplay(selectedCurrency, amount)} ${selectedCurrency}`,
-    });
+    if (usesServerWallet()) {
+      submitBtn.disabled = true;
+      const result = await postWalletAction({
+        action: 'send',
+        admin: getLoggedInUsername(),
+        to: getLoggedInUsername(),
+        amount,
+        currency: selectedCurrency,
+      });
+      submitBtn.disabled = false;
+      if (!result?.ok) {
+        depositSuccess.textContent = result?.data?.error || 'Deposit failed';
+        depositSuccess.hidden = false;
+        return;
+      }
+      await syncWalletGrantsFromServer();
+    } else {
+      const newBalance = getWalletBalance(selectedCurrency) + amount;
+      setWalletBalance(selectedCurrency, newBalance);
+      recordTransaction({
+        type: 'deposit',
+        amount,
+        currency: selectedCurrency,
+        label: 'Deposit',
+        detail: selectedCurrency === 'USD'
+          ? `Deposited $${amount.toFixed(2)}`
+          : `Deposited ${formatWalletDisplay(selectedCurrency, amount)} ${selectedCurrency}`,
+      });
+    }
 
     const activeOption = getWalletOption(selectedCurrency);
     if (activeOption) {

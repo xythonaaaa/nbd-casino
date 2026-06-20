@@ -1,4 +1,10 @@
 import { isAdmin } from '../lib/admin.js';
+import {
+  actGameSession,
+  ensureSessionStore,
+  resolveGameRound,
+  startGameSession,
+} from '../lib/game-play.js';
 import { json, methodNotAllowed, corsOptions, parseJson } from '../lib/http.js';
 import { kvGet, kvSet } from '../lib/kv.js';
 
@@ -329,6 +335,106 @@ function setPlayerProfile(store, admin, username, options = {}) {
   return { ok: true, username: player, profile: getPlayerProfile(store, player) };
 }
 
+function walletResponseForUser(store, player) {
+  return {
+    grants: getGrantsForUser(store, player),
+    balances: getBalancesForUser(store, player),
+    combined: getCombinedForUser(store, player),
+  };
+}
+
+function playWalletRound(store, username, game, bet, currency, params) {
+  const player = resolveWalletUser(store, username);
+  if (!player) return { error: 'Not registered' };
+  if (isSelfExcluded(store, player)) return { error: 'You are self-excluded and cannot bet' };
+
+  const cur = String(currency || 'USD').toUpperCase();
+  if (!VALID_CURRENCIES.includes(cur)) return { error: 'Invalid currency' };
+
+  const amt = parseFloat(bet);
+  if (!amt || amt <= 0) return { error: 'Invalid bet amount' };
+
+  const combined = getCombinedForUser(store, player);
+  if (combined[cur] < amt) return { error: 'Insufficient balance' };
+
+  const outcome = resolveGameRound(String(game || ''), amt, params || {});
+  if (outcome.error) return outcome;
+
+  if (!debitCombined(store, player, cur, amt)) return { error: 'Insufficient balance' };
+  if (outcome.payout > 0) creditCombined(store, player, cur, outcome.payout);
+
+  return {
+    ok: true,
+    game,
+    bet: amt,
+    payout: outcome.payout,
+    outcome: outcome.data,
+    ...walletResponseForUser(store, player),
+  };
+}
+
+function startWalletSession(store, username, game, bet, currency, params) {
+  const player = resolveWalletUser(store, username);
+  if (!player) return { error: 'Not registered' };
+  if (isSelfExcluded(store, player)) return { error: 'You are self-excluded and cannot bet' };
+
+  const cur = String(currency || 'USD').toUpperCase();
+  if (!VALID_CURRENCIES.includes(cur)) return { error: 'Invalid currency' };
+
+  const amt = parseFloat(bet);
+  if (!amt || amt <= 0) return { error: 'Invalid bet amount' };
+
+  const combined = getCombinedForUser(store, player);
+  if (combined[cur] < amt) return { error: 'Insufficient balance' };
+
+  const started = startGameSession(String(game || ''), amt, params || {});
+  if (started.error) return started;
+
+  if (!debitCombined(store, player, cur, amt)) return { error: 'Insufficient balance' };
+
+  const meta = ensureUserMeta(store, player);
+  const sessions = ensureSessionStore(meta);
+  sessions[started.sessionId] = { ...started.state, currency: cur, username: player };
+
+  return {
+    ok: true,
+    sessionId: started.sessionId,
+    game,
+    bet: amt,
+    clientState: game === 'crash' ? { crashPoint: started.state.crashPoint } : null,
+    ...walletResponseForUser(store, player),
+  };
+}
+
+function actWalletSession(store, username, sessionId, action, params) {
+  const player = resolveWalletUser(store, username);
+  if (!player) return { error: 'Not registered' };
+  if (isSelfExcluded(store, player)) return { error: 'You are self-excluded and cannot bet' };
+
+  const meta = ensureUserMeta(store, player);
+  const sessions = ensureSessionStore(meta);
+  const session = sessions[String(sessionId || '')];
+  if (!session) return { error: 'Session not found' };
+
+  const result = actGameSession(session, String(action || ''), params || {});
+  if (result.error) return result;
+
+  const cur = session.currency || 'USD';
+  if (result.done) {
+    if (result.payout > 0) creditCombined(store, player, cur, result.payout);
+    delete sessions[sessionId];
+  }
+
+  return {
+    ok: true,
+    sessionId,
+    done: !!result.done,
+    payout: result.payout || 0,
+    outcome: result.data,
+    ...walletResponseForUser(store, player),
+  };
+}
+
 function tipPlayer(store, from, to, amount, currency) {
   const senderRaw = String(from || '').trim().slice(0, 16);
   const recipientRaw = String(to || '').trim().slice(0, 16);
@@ -472,6 +578,50 @@ export async function onRequest(context) {
     if (payload.action === 'self-exclude') {
       const result = await writeStore(kv, data =>
         applySelfExclusion(data, payload.username, payload.duration)
+      );
+      if (result.error) return json(result, { status: 400 });
+      return json(result);
+    }
+
+    if (payload.action === 'play') {
+      const result = await writeStore(kv, data =>
+        playWalletRound(
+          data,
+          payload.username,
+          payload.game,
+          payload.bet,
+          payload.currency,
+          payload.params
+        )
+      );
+      if (result.error) return json(result, { status: 400 });
+      return json(result);
+    }
+
+    if (payload.action === 'session-start') {
+      const result = await writeStore(kv, data =>
+        startWalletSession(
+          data,
+          payload.username,
+          payload.game,
+          payload.bet,
+          payload.currency,
+          payload.params
+        )
+      );
+      if (result.error) return json(result, { status: 400 });
+      return json(result);
+    }
+
+    if (payload.action === 'session-act') {
+      const result = await writeStore(kv, data =>
+        actWalletSession(
+          data,
+          payload.username,
+          payload.sessionId,
+          payload.act,
+          payload.params
+        )
       );
       if (result.error) return json(result, { status: 400 });
       return json(result);

@@ -13,6 +13,7 @@ const state = {
   revealed: new Set(),
   gemsFound: 0,
   lastHitIndex: null,
+  sessionId: null,
   autoPicks: new Set(),
   autoPickOrder: [],
   auto: {
@@ -143,6 +144,10 @@ function handleGridClick(e) {
     return;
   }
 
+  void handleTileClick(index);
+}
+
+async function handleTileClick(index) {
   if (state.panel !== 'manual' || state.phase !== 'active') {
     if (state.panel === 'manual' && state.phase === 'idle') {
       setMessage('Place a bet first, then pick tiles on the grid', 'lose');
@@ -150,12 +155,12 @@ function handleGridClick(e) {
     return;
   }
 
-  const result = revealTile(index);
+  const result = await revealTile(index);
   if (!result) return;
   if (result.hitMine) {
     handleManualLoss(result.index);
   } else if (state.gemsFound >= GRID_SIZE - state.mines) {
-    handleManualCashout(true);
+    await handleManualCashout(true);
   }
 }
 
@@ -499,20 +504,26 @@ function validateBetAmount(bet) {
   return null;
 }
 
-function initRound(bet, mines, currency) {
-  const debitResult = window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
-    type: 'bet',
-    label: 'Mines',
-    detail: `Bet $${bet.toFixed(2)} — ${mines} mines`,
+async function initRound(bet, mines, currency) {
+  const started = await window.XythonWallet?.startSession?.({
     game: 'mines',
+    bet,
+    currency,
+    params: { mines },
+    tx: {
+      label: 'Mines',
+      detail: `Bet $${bet.toFixed(2)} — ${mines} mines`,
+      game: 'mines',
+    },
   });
-  if (debitResult?.ok === false) return { error: debitResult.error };
+  if (!started?.ok) return { error: started?.error || 'Could not start round' };
 
   state.phase = 'active';
   state.bet = bet;
   state.currency = currency;
   state.mines = mines;
-  state.mineSet = shuffleMines(mines);
+  state.sessionId = started.sessionId;
+  state.mineSet = new Set();
   state.revealed = new Set();
   state.gemsFound = 0;
   state.lastHitIndex = null;
@@ -520,19 +531,32 @@ function initRound(bet, mines, currency) {
   enableUnrevealedTiles();
   updateStats();
   updateUI();
+  return { ok: true };
 }
 
-function revealTile(index) {
-  if (state.phase !== 'active') return null;
+async function revealTile(index) {
+  if (state.phase !== 'active' || !state.sessionId) return null;
   if (state.revealed.has(index)) return null;
+
+  const result = await window.XythonWallet?.actSession?.({
+    sessionId: state.sessionId,
+    act: 'reveal',
+    params: { index },
+  });
+  if (!result?.ok) {
+    setMessage(result?.error || 'Could not reveal tile', 'lose');
+    return null;
+  }
 
   state.revealed.add(index);
 
-  if (state.mineSet.has(index)) {
+  if (result.outcome?.hitMine) {
+    state.mineSet = new Set(result.outcome.mineSet || []);
+    state.sessionId = null;
     return { hitMine: true, index };
   }
 
-  state.gemsFound += 1;
+  state.gemsFound = result.outcome?.gemsFound ?? state.gemsFound;
   renderGemTile(index);
   updateStats();
   updateUI();
@@ -559,19 +583,25 @@ function finalizeLoss(hitIndex, recordStats = true) {
   return { won: false, netProfit: -state.bet, bet: state.bet };
 }
 
-function finalizeCashout(recordStats = true) {
-  const mult = getMultiplier(state.mines, state.gemsFound);
-  const payout = state.bet * mult;
-  const currency = state.currency;
+async function finalizeCashout(recordStats = true) {
+  const result = await window.XythonWallet?.actSession?.({
+    sessionId: state.sessionId,
+    act: 'cashout',
+    tx: {
+      label: 'Mines',
+      game: 'mines',
+      detail: `${state.gemsFound} gems cashed out`,
+    },
+  });
+  state.sessionId = null;
+
+  const mult = result?.outcome?.multiplier ?? getMultiplier(state.mines, state.gemsFound);
+  const payout = result?.payout ?? state.bet * mult;
   const netProfit = payout - state.bet;
 
-  window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) + payout, {
-    type: 'win',
-    label: 'Mines',
-    detail: `${mult.toFixed(2)}x — $${payout.toFixed(2)} (${state.gemsFound} gems)`,
-    game: 'mines',
-  });
-
+  if (result?.outcome?.mineSet) {
+    state.mineSet = new Set(result.outcome.mineSet);
+  }
   state.mineSet.forEach(index => {
     if (!state.revealed.has(index)) renderMineTile(index, false);
   });
@@ -588,6 +618,7 @@ function resetRound() {
   state.revealed = new Set();
   state.gemsFound = 0;
   state.lastHitIndex = null;
+  state.sessionId = null;
   els.grid?.classList.remove('mn-grid--ended');
   syncGridView();
   updateStats();
@@ -609,7 +640,7 @@ async function startRound() {
   const mines = parseInt(els.mines.value, 10) || 3;
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
 
-  const round = initRound(bet, mines, currency);
+  const round = await initRound(bet, mines, currency);
   if (round?.error) {
     setMessage(round.error, 'lose');
     return;
@@ -617,26 +648,27 @@ async function startRound() {
   setMessage('Pick tiles on the grid — cash out anytime after a gem', '');
 }
 
-function pickRandomTile() {
+async function pickRandomTile() {
   if (state.phase !== 'active' || state.auto.running) return;
   const hidden = getHiddenTiles();
   if (!hidden.length) return;
-  const result = revealTile(hidden[Math.floor(Math.random() * hidden.length)]);
+  const result = await revealTile(hidden[Math.floor(Math.random() * hidden.length)]);
   if (result?.hitMine) {
     handleManualLoss(result.index);
   } else if (state.gemsFound >= GRID_SIZE - state.mines) {
-    handleManualCashout(true);
+    await handleManualCashout(true);
   }
 }
 
 function cashOut(perfectBoard = false) {
   if (state.phase !== 'active' || state.gemsFound === 0 || state.auto.running) return;
-  handleManualCashout(perfectBoard);
+  void handleManualCashout(perfectBoard);
 }
 
 function handleManualLoss(hitIndex) {
   state.phase = 'ended';
   state.lastHitIndex = hitIndex;
+  state.sessionId = null;
   finalizeLoss(hitIndex);
   els.grid?.classList.remove('mn-grid--pick');
   els.grid?.classList.add('mn-grid--active', 'mn-grid--ended');
@@ -645,10 +677,10 @@ function handleManualLoss(hitIndex) {
   updateUI();
 }
 
-function handleManualCashout(perfectBoard) {
+async function handleManualCashout(perfectBoard) {
   state.phase = 'ended';
   state.lastHitIndex = null;
-  const result = finalizeCashout();
+  const result = await finalizeCashout();
   els.grid?.classList.remove('mn-grid--pick');
   els.grid?.classList.add('mn-grid--active', 'mn-grid--ended');
   renderBoardFromState();
@@ -691,7 +723,7 @@ async function playAutoRound(pickOrder) {
   const mines = parseInt(els.mines.value, 10) || 3;
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
 
-  const round = initRound(bet, mines, currency);
+  const round = await initRound(bet, mines, currency);
   if (round?.error) return round;
   els.grid?.classList.remove('mn-grid--pick');
   els.grid?.classList.add('mn-grid--active');
@@ -700,7 +732,7 @@ async function playAutoRound(pickOrder) {
     if (!state.auto.running) return { stopped: true };
 
     const index = pickOrder[i];
-    const result = revealTile(index);
+    const result = await revealTile(index);
 
     if (result?.hitMine) {
       const loss = finalizeLoss(index);
@@ -716,7 +748,7 @@ async function playAutoRound(pickOrder) {
     return { error: 'No tiles selected' };
   }
 
-  const win = finalizeCashout();
+  const win = await finalizeCashout();
   state.phase = 'idle';
   return win;
 }

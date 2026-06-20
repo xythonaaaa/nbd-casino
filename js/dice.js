@@ -308,32 +308,27 @@ async function executeRoll(options = {}) {
 
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
   const mult = getMultiplier(state.mode, state.target);
-  const balance = window.XythonWallet?.getBalance(currency) ?? 0;
 
-  const debitResult = window.XythonWallet?.setBalance(currency, balance - bet, {
-    type: 'bet',
-    label: 'Dice',
-    detail: `Bet $${bet.toFixed(2)}`,
+  const play = await window.XythonWallet?.playRound?.({
     game: 'dice',
+    bet,
+    currency,
+    params: { mode: state.mode, target: state.target },
+    tx: {
+      label: 'Dice',
+      detail: `Bet $${bet.toFixed(2)}`,
+      game: 'dice',
+      winDetail: `${mult.toFixed(2)}x — $${(bet * mult).toFixed(2)}`,
+    },
   });
-  if (debitResult?.ok === false) return { error: debitResult.error };
+  if (!play?.ok) return { error: play?.error || 'Could not place bet' };
 
-  const roll = rollValue();
-  const won = isWin(roll, state.mode, state.target);
-  const payout = won ? bet * mult : 0;
+  const roll = play.outcome.roll;
+  const won = play.outcome.won;
+  const payout = play.payout;
   const netProfit = payout - bet;
 
   await animateRoll(roll, won, options);
-
-  if (won) {
-    const newBalance = window.XythonWallet?.getBalance(currency) ?? 0;
-    window.XythonWallet?.setBalance(currency, newBalance + payout, {
-      type: 'win',
-      label: 'Dice',
-      detail: `${mult.toFixed(2)}x — $${payout.toFixed(2)}`,
-      game: 'dice',
-    });
-  }
 
   window.XythonStats?.recordRound?.(bet, won, { game: 'dice', payout });
   addHistory(roll, won);

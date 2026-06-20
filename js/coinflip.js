@@ -279,22 +279,33 @@ async function flipCoin({ silent = false, fast = false } = {}) {
 
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
   const pick = state.side;
-  const result = flipResult();
-  const won = result === pick;
-  const payout = won ? bet * PAYOUT_MULT : 0;
-  const netProfit = payout - bet;
 
   state.flipping = true;
   updateUI();
   hidePopup();
 
-  const debitResult = window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
-    type: 'bet',
-    label: 'Coinflip',
-    detail: `$${bet.toFixed(2)} on ${sideLabel(pick)}`,
+  const play = await window.XythonWallet?.playRound?.({
     game: 'coinflip',
+    bet,
+    currency,
+    params: { side: pick },
+    tx: {
+      label: 'Coinflip',
+      detail: `$${bet.toFixed(2)} on ${sideLabel(pick)}`,
+      game: 'coinflip',
+    },
   });
-  if (debitResult?.ok === false) return { error: debitResult.error };
+  if (!play?.ok) {
+    state.flipping = false;
+    updateUI();
+    if (!silent) setMessage(play?.error || 'Could not place bet', 'lose');
+    return { error: play?.error || 'Could not place bet' };
+  }
+
+  const result = play.outcome.outcome;
+  const won = play.outcome.won;
+  const payout = play.payout;
+  const netProfit = payout - bet;
 
   if (!silent) {
     setMessage('');
@@ -303,15 +314,6 @@ async function flipCoin({ silent = false, fast = false } = {}) {
 
   els.flipStage.classList.remove('is-win', 'is-lose');
   await animateCoin(result, { fast });
-
-  if (won) {
-    window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) + payout, {
-      type: 'win',
-      label: 'Coinflip',
-      detail: `${sideLabel(result)} — $${payout.toFixed(2)}`,
-      game: 'coinflip',
-    });
-  }
 
   window.XythonStats?.recordRound?.(bet, won, { game: 'coinflip', payout });
   pushHistory({ result, won, pick });

@@ -4154,6 +4154,38 @@ function initAuthModal() {
       return;
     }
 
+    if (getAuthApiUrl()) {
+      submitBtn.disabled = true;
+      const login = await serverLoginAccount(username, password);
+      submitBtn.disabled = false;
+      if (!login?.ok) {
+        errorEl.textContent = login?.data?.error || 'Could not log in';
+        errorEl.hidden = false;
+        successEl.hidden = true;
+        passwordInput.focus();
+        return;
+      }
+      saveSession(login.data.sessionToken, login.data.username, login.data.expiresAt, login.data.isAdmin);
+      saveUser(username);
+      notifyAuthChange();
+      await syncCurrentUserToServer();
+      if (!getUserReferrer(username)) {
+        const affCode = getPendingReferralCode().trim();
+        if (affCode && affCode.toLowerCase() !== username.toLowerCase()) {
+          await linkReferral(username, affCode);
+        }
+      }
+      successEl.textContent = `Welcome back, ${username}!`;
+      successEl.hidden = false;
+      errorEl.hidden = true;
+
+      setTimeout(() => {
+        closeAuthModal();
+        renderAuthUI();
+      }, 700);
+      return;
+    }
+
     if (!hasAccount(username)) {
       errorEl.textContent = 'Account not found. Register to create one.';
       errorEl.hidden = false;
@@ -4177,20 +4209,6 @@ function initAuthModal() {
       successEl.hidden = true;
       passwordInput.focus();
       return;
-    }
-
-    if (getAuthApiUrl()) {
-      submitBtn.disabled = true;
-      const login = await serverLoginAccount(username, password);
-      submitBtn.disabled = false;
-      if (!login?.ok) {
-        errorEl.textContent = login?.data?.error || 'Could not log in';
-        errorEl.hidden = false;
-        successEl.hidden = true;
-        passwordInput.focus();
-        return;
-      }
-      saveSession(login.data.sessionToken, login.data.username, login.data.expiresAt, login.data.isAdmin);
     }
 
     saveUser(username);

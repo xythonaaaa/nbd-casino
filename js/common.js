@@ -2434,8 +2434,20 @@ function saveSession(token, username, expiresAt, isAdminFlag = false) {
     username: username || getLoggedInUsername(),
     expiresAt: expiresAt || 0,
     isAdmin: !!isAdminFlag,
+    loginAt: Date.now(),
   }));
 }
+
+function persistAuthResponse(data) {
+  if (!data?.sessionToken || !data?.username) return false;
+  saveSession(data.sessionToken, data.username, data.expiresAt, data.isAdmin);
+  saveUser(data.username);
+  notifyAuthChange();
+  renderAuthUI();
+  return true;
+}
+
+window.persistAuthResponse = persistAuthResponse;
 
 function hydrateSessionFromStorage() {
   try {
@@ -2528,22 +2540,41 @@ async function serverLoginAccount(username, password) {
   return postAuthAction({ action: 'login', username, password });
 }
 
-async function verifyServerSession() {
+function invalidateLocalSession() {
+  clearSession();
+  localStorage.removeItem(USER_STORAGE_KEY);
+  serverAuthProfile = { username: null, isAdmin: false };
+  notifyAuthChange();
+}
+
+async function verifyServerSession(retry = true) {
   const url = getAuthApiUrl();
   const token = getSessionToken();
   if (!url) return true;
   if (!token) {
     purgeInsecureClientStorage();
-    if (getLoggedInUser()) clearUser();
     return false;
   }
+
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    const stored = raw ? JSON.parse(raw) : {};
+    if (stored.loginAt && Date.now() - stored.loginAt < 5000) {
+      return true;
+    }
+  } catch { /* ignore */ }
+
   try {
     const res = await trustedFetch(`${url}?token=${encodeURIComponent(token)}`, { cache: 'no-store' });
-    if (!res.ok) {
-      clearSession();
-      clearUser();
+    if (res.status === 401 || res.status === 403) {
+      if (retry) {
+        await new Promise(resolve => setTimeout(resolve, 600));
+        return verifyServerSession(false);
+      }
+      invalidateLocalSession();
       return false;
     }
+    if (!res.ok) return true;
     const data = await res.json();
     if (data.username) saveUser(data.username);
     serverAuthProfile = {
@@ -2552,7 +2583,7 @@ async function verifyServerSession() {
     };
     return true;
   } catch {
-    return false;
+    return true;
   }
 }
 

@@ -1,5 +1,9 @@
 import { isAdmin } from '../lib/admin.js';
 import {
+  appendSystemChatMessage,
+  formatTipChatMessage,
+} from '../lib/chat-store.js';
+import {
   actGameSession,
   ensureSessionStore,
   getClientSessionState,
@@ -749,6 +753,12 @@ export async function onRequest(context) {
         tipPlayer(data, payload.from, payload.to, payload.amount, payload.currency)
       );
       if (result.error) return json(result, { status: 400 });
+      if (result.ok && env.CHAT_KV) {
+        await appendSystemChatMessage(
+          env.CHAT_KV,
+          formatTipChatMessage(result.from, result.to, result.amount)
+        );
+      }
       return json(result);
     }
 

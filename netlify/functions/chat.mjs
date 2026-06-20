@@ -8,6 +8,10 @@ function isAdmin(username) {
   return ADMIN_USERNAMES.some(u => u.toLowerCase() === name);
 }
 
+function isReservedChatUser(username) {
+  return String(username || '').trim().toLowerCase() === 'system';
+}
+
 export default async (req) => {
   const store = getStore('nbd-chat');
 
@@ -51,6 +55,9 @@ export default async (req) => {
     const user = String(payload.user || '').trim().slice(0, 16);
     if (!text || !user) {
       return Response.json({ error: 'Invalid message' }, { status: 400 });
+    }
+    if (isReservedChatUser(user)) {
+      return Response.json({ error: 'Invalid username' }, { status: 400 });
     }
 
     const existing = (await store.get('messages', { type: 'json' })) || [];

@@ -1,9 +1,13 @@
 import { isAdmin } from '../lib/admin.js';
+import {
+  CHAT_MESSAGES_KEY,
+  CHAT_MAX_MESSAGES,
+  isReservedChatUser,
+} from '../lib/chat-store.js';
 import { json, methodNotAllowed, corsOptions, parseJson } from '../lib/http.js';
 import { kvGet, kvSet } from '../lib/kv.js';
 
-const MAX_MESSAGES = 200;
-const STORE_KEY = 'messages';
+const STORE_KEY = CHAT_MESSAGES_KEY;
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -48,6 +52,9 @@ export async function onRequest(context) {
     if (!text || !user) {
       return json({ error: 'Invalid message' }, 400);
     }
+    if (isReservedChatUser(user)) {
+      return json({ error: 'Invalid username' }, 400);
+    }
 
     const existing = (await kvGet(kv, STORE_KEY, [])) || [];
     const messages = Array.isArray(existing) ? existing : [];
@@ -58,7 +65,7 @@ export async function onRequest(context) {
       ts: Date.now(),
     });
 
-    const trimmed = messages.slice(-MAX_MESSAGES);
+    const trimmed = messages.slice(-CHAT_MAX_MESSAGES);
     await kvSet(kv, STORE_KEY, trimmed);
     return json({ ok: true, messages: trimmed });
   }

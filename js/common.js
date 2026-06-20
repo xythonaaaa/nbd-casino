@@ -1528,7 +1528,6 @@ async function executeTip(recipient, amount) {
   const displaySender = getPublicUsername();
   const tipMsg = `${displaySender} tipped ${data.to} $${amount.toFixed(2)}`;
   if (getChatApiUrl()) {
-    await postChatToServer('System', tipMsg);
     await refreshChatMessages();
   }
 

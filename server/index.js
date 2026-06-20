@@ -61,6 +61,23 @@ function saveMessages(messages) {
   fs.writeFileSync(CHAT_FILE, JSON.stringify(messages.slice(-MAX_MESSAGES), null, 2));
 }
 
+function isReservedChatUser(username) {
+  return String(username || '').trim().toLowerCase() === 'system';
+}
+
+function appendSystemChatMessage(text) {
+  const clean = String(text || '').trim().slice(0, 240);
+  if (!clean) return;
+  const messages = loadMessages();
+  messages.push({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    user: 'System',
+    text: clean,
+    ts: Date.now(),
+  });
+  saveMessages(messages);
+}
+
 function isBlockedLeaderboardEntry(entry) {
   if ((parseFloat(entry?.bet) || 0) > LEADERBOARD_MAX_BET) return true;
   const key = String(entry?.user || '').trim().toLowerCase();
@@ -952,6 +969,7 @@ function handleWalletRequest(req, res, urlPath) {
             sendJson(res, 400, result);
             return;
           }
+          appendSystemChatMessage(`${result.from} tipped ${result.to} $${result.amount.toFixed(2)}`);
         } else if (action === 'reset-all') {
           if (!isWalletAdmin(payload.admin)) {
             sendJson(res, 403, { error: 'Admin only' });
@@ -1126,6 +1144,10 @@ const server = http.createServer((req, res) => {
         const user = String(payload.user || '').trim().slice(0, 16);
         if (!text || !user) {
           sendJson(res, 400, { error: 'Invalid message' });
+          return;
+        }
+        if (isReservedChatUser(user)) {
+          sendJson(res, 400, { error: 'Invalid username' });
           return;
         }
 

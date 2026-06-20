@@ -1054,8 +1054,12 @@ function renderBets() {
 }
 
 function initLiveBets() {
-  renderBets();
-  document.addEventListener('xython:leaderboard-change', renderBets);
+  const refreshLiveFeed = () => {
+    renderBets();
+    if (document.getElementById('liveWinsTrack')) renderLiveWins();
+  };
+  refreshLiveFeed();
+  document.addEventListener('xython:leaderboard-change', refreshLiveFeed);
 }
 
 let chatCache = [];
@@ -2166,6 +2170,7 @@ async function recordLeaderboardRound({ game, bet, payout, mult, won }) {
 
   saveLeaderboardLocal(data);
   leaderboardCache = data;
+  document.dispatchEvent(new CustomEvent('xython:leaderboard-change', { detail: leaderboardCache }));
 }
 
 function getLeaderboardWins(game, sort, limit = 5) {

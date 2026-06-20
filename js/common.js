@@ -10,6 +10,25 @@ const SEVEN_TV_GLOBAL_SET_URL = 'https://7tv.io/v3/emote-sets/global';
 const SEVEN_TV_USER_ID = '01K6MVTSE5YJYFY6KBMHYJ5QM5';
 const SEVEN_TV_USER_URL = `https://7tv.io/v3/users/${SEVEN_TV_USER_ID}`;
 
+// Captured before any attacker hook — never use bare window.fetch for site APIs.
+const __nativeFetch = window.fetch.bind(window);
+const __IS_LIVE_SITE = (() => {
+  try {
+    return /nbdcasino\.com$/i.test(location.hostname || '');
+  } catch {
+    return false;
+  }
+})();
+
+const trustedFetch = (...args) => __nativeFetch(...args);
+
+function requiresServerWallet() {
+  if (__IS_LIVE_SITE) return true;
+  if (window.NBD_WALLET_API) return true;
+  return location.protocol === 'http:' || location.protocol === 'https:';
+}
+
+const usesServerWallet = () => requiresServerWallet();
 const PANEL_STORAGE_KEY = 'xython-panel-open';
 const WALLET_STORAGE_KEY = 'xython-wallet';
 const VAULT_STORAGE_KEY = 'xython-vault';
@@ -20,7 +39,7 @@ let sessionVerifyTimer = null;
 const SESSION_VERIFY_MS = 30000;
 
 function isAdmin(username) {
-  if (getAuthApiUrl()) {
+  if (__IS_LIVE_SITE || getAuthApiUrl()) {
     if (!isLoggedIn()) return false;
     const name = (username || getLoggedInUsername() || '').trim().toLowerCase();
     if (!name) return false;
@@ -50,16 +69,12 @@ let serverLastDailyClaimAt = 0;
 const SERVER_WALLET_DEFAULT = { USD: 0, BTC: 0, ETH: 0, LTC: 0 };
 let serverWalletBalances = { ...SERVER_WALLET_DEFAULT };
 
-function usesServerWallet() {
-  return !!getWalletApiUrl();
-}
-
 function resetServerWalletCache() {
   serverWalletBalances = { ...SERVER_WALLET_DEFAULT };
 }
 
 function refreshServerWalletDisplay() {
-  if (!usesServerWallet()) return;
+  if (!requiresServerWallet()) return;
   walletMutationAllowed = true;
   WALLET_CURRENCIES.forEach(currency => {
     setWalletBalance(currency, serverWalletBalances[currency] ?? 0, false);
@@ -362,7 +377,7 @@ async function serverClaimReward({ kind, amount, tx }) {
 }
 
 function applyInternalWalletDelta(currency, delta, tx) {
-  if (usesServerWallet()) return;
+  if (requiresServerWallet()) return;
   if (!delta) return;
   walletMutationAllowed = true;
   const cur = currency || window.XythonWallet?.getActiveCurrency?.() || 'USD';
@@ -394,7 +409,7 @@ async function postWalletAction(payload) {
   const token = getSessionToken();
   if (token) payload.sessionToken = token;
   try {
-    const res = await fetch(url, {
+    const res = await trustedFetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -412,7 +427,7 @@ async function postLeaderboardAction(payload) {
   const token = getSessionToken();
   if (token) payload.sessionToken = token;
   try {
-    const res = await fetch(url, {
+    const res = await trustedFetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -439,7 +454,7 @@ async function fetchAdminPlayers() {
   try {
     const token = getSessionToken();
     if (!token) return { ok: false, data: { error: 'Log in to continue' } };
-    const res = await fetch(`${url}?sessionToken=${encodeURIComponent(token)}`, { cache: 'no-store' });
+    const res = await trustedFetch(`${url}?sessionToken=${encodeURIComponent(token)}`, { cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return { ok: false, data };
     return { ok: true, data };
@@ -454,7 +469,7 @@ async function postAdminPlayersAction(payload) {
   const token = getSessionToken();
   if (token) payload.sessionToken = token;
   try {
-    const res = await fetch(url, {
+    const res = await trustedFetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -504,7 +519,7 @@ async function fetchServerGrants(username) {
     const token = getSessionToken();
     const qs = new URLSearchParams({ user: username });
     if (token) qs.set('sessionToken', token);
-    const res = await fetch(`${url}?${qs.toString()}`, { cache: 'no-store' });
+    const res = await trustedFetch(`${url}?${qs.toString()}`, { cache: 'no-store' });
     if (!res.ok) return null;
     const data = await res.json();
     if (data.resetAt) await applyServerWalletReset(data.resetAt);
@@ -693,7 +708,7 @@ async function fetchWalletResetAt() {
   const url = getWalletApiUrl();
   if (!url) return 0;
   try {
-    const res = await fetch(`${url}?meta=resetAt`, { cache: 'no-store' });
+    const res = await trustedFetch(`${url}?meta=resetAt`, { cache: 'no-store' });
     if (!res.ok) return 0;
     const data = await res.json();
     return Math.max(0, parseInt(data.resetAt, 10) || 0);
@@ -702,7 +717,7 @@ async function fetchWalletResetAt() {
   }
 }
 
-async function applyServerWalletReset(resetAt) {
+const applyServerWalletReset = async function(resetAt) {
   const ts = Math.max(0, parseInt(resetAt, 10) || 0);
   if (!ts || ts <= loadWalletResetAck()) return false;
 
@@ -1392,7 +1407,7 @@ async function fetchChatFromServer() {
   if (!url) return null;
 
   try {
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await trustedFetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
     const data = await res.json();
     const messages = Array.isArray(data.messages) ? data.messages : null;
@@ -1411,7 +1426,7 @@ async function postChatToServer(text) {
   if (token) payload.sessionToken = token;
 
   try {
-    const res = await fetch(url, {
+    const res = await trustedFetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -1427,7 +1442,7 @@ async function deleteChatMessageFromServer(messageId, admin) {
   if (!url) return null;
 
   try {
-    const res = await fetch(url, {
+    const res = await trustedFetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2046,7 +2061,7 @@ async function fetchLeaderboardFromServer() {
   if (!url) return null;
 
   try {
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await trustedFetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
     const data = await res.json();
     return normalizeLeaderboardData(data);
@@ -2107,7 +2122,7 @@ async function recordLeaderboardRound({ game, bet, payout, mult, won }) {
   const url = getLeaderboardApiUrl();
   if (url) {
     try {
-      const res = await fetch(url, {
+      const res = await trustedFetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -2367,7 +2382,7 @@ function escapeHtml(text) {
 }
 
 function getLoggedInUser() {
-  if (getAuthApiUrl() && !getSessionToken()) return null;
+  if ((__IS_LIVE_SITE || getAuthApiUrl()) && !getSessionToken()) return null;
   try {
     const raw = localStorage.getItem(USER_STORAGE_KEY);
     if (!raw) return null;
@@ -2428,25 +2443,37 @@ function clearSession() {
 }
 
 function purgeInsecureClientStorage() {
-  if (!getAuthApiUrl()) return;
+  if (!requiresServerWallet()) return;
   localStorage.removeItem(WALLET_STORAGE_KEY);
   if (!getSessionToken()) {
     localStorage.removeItem(USER_STORAGE_KEY);
     resetServerWalletCache();
     serverAuthProfile = { username: null, isAdmin: false };
+    refreshServerWalletDisplay();
   }
 }
 
 function installProductionWalletGuard() {
-  if (!getWalletApiUrl() || !window.XythonWallet) return;
+  if (!requiresServerWallet() || !window.XythonWallet) return;
   const blocked = () => ({ ok: false, error: 'Balance is managed by the server' });
+  const orig = window.XythonWallet;
   const wallet = {
-    ...window.XythonWallet,
-    setBalance: blocked,
-    debitBet(currency, bet, tx) {
-      if (usesServerWallet()) return blocked();
-      return window.XythonWallet.debitBet.call(this, currency, bet, tx);
+    getActiveCurrency: () => orig.getActiveCurrency(),
+    getBalance(currency) {
+      return getWalletBalance(currency || orig.getActiveCurrency());
     },
+    get usesServerWallet() {
+      return requiresServerWallet();
+    },
+    playRound: serverPlayRound,
+    startSession: serverStartSession,
+    actSession: serverActSession,
+    sessionDebit: serverSessionDebit,
+    sessionCredit: serverSessionCredit,
+    sessionSettle: serverSessionSettle,
+    debitBet: blocked,
+    setBalance: blocked,
+    formatAmount: (currency, value) => orig.formatAmount(currency, value),
   };
   Object.freeze(wallet);
   Object.defineProperty(window, 'XythonWallet', {
@@ -2456,8 +2483,30 @@ function installProductionWalletGuard() {
   });
 }
 
+let fetchTamperDetected = false;
+
+function detectClientTampering() {
+  if (!__IS_LIVE_SITE || fetchTamperDetected) return false;
+  if (window.fetch === __nativeFetch) return false;
+  fetchTamperDetected = true;
+  clearSession();
+  if (localStorage.getItem(USER_STORAGE_KEY)) clearUser();
+  localStorage.removeItem(WALLET_STORAGE_KEY);
+  resetServerWalletCache();
+  refreshServerWalletDisplay();
+  renderAuthUI();
+  showToast('Security check failed. Please log in again.', 'error');
+  return true;
+}
+
+function startTamperDetectionPolling() {
+  if (!__IS_LIVE_SITE) return;
+  detectClientTampering();
+  setInterval(detectClientTampering, 5000);
+}
+
 function startSessionVerifyPolling() {
-  if (!getAuthApiUrl()) return;
+  if (!__IS_LIVE_SITE && !getAuthApiUrl()) return;
   if (sessionVerifyTimer) clearInterval(sessionVerifyTimer);
   sessionVerifyTimer = setInterval(() => {
     if (getSessionToken()) verifyServerSession();
@@ -2468,7 +2517,7 @@ async function postAuthAction(payload) {
   const url = getAuthApiUrl();
   if (!url) return null;
   try {
-    const res = await fetch(url, {
+    const res = await trustedFetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -2498,7 +2547,7 @@ async function verifyServerSession() {
     return false;
   }
   try {
-    const res = await fetch(`${url}?token=${encodeURIComponent(token)}`, { cache: 'no-store' });
+    const res = await trustedFetch(`${url}?token=${encodeURIComponent(token)}`, { cache: 'no-store' });
     if (!res.ok) {
       clearSession();
       clearUser();
@@ -2544,7 +2593,7 @@ async function postAffiliateAction(payload) {
   const token = getSessionToken();
   if (token) payload.sessionToken = token;
   try {
-    const res = await fetch(url, {
+    const res = await trustedFetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -2560,7 +2609,7 @@ async function fetchAffiliateFromServer(username) {
   const url = getAffiliateApiUrl();
   if (!url || !username) return null;
   try {
-    const res = await fetch(`${url}?user=${encodeURIComponent(username)}`);
+    const res = await trustedFetch(`${url}?user=${encodeURIComponent(username)}`);
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -2580,13 +2629,13 @@ async function checkReferrerExists(code) {
   const url = getAffiliateApiUrl();
   if (url) {
     try {
-      const res = await fetch(`${url}?exists=${encodeURIComponent(trimmed)}`);
+      const res = await trustedFetch(`${url}?exists=${encodeURIComponent(trimmed)}`);
       if (res.ok) {
         const data = await res.json();
         if (data.exists) return true;
         if (isRegisteredUser(trimmed)) {
           await registerUserOnServer(trimmed);
-          const retry = await fetch(`${url}?exists=${encodeURIComponent(trimmed)}`);
+          const retry = await trustedFetch(`${url}?exists=${encodeURIComponent(trimmed)}`);
           if (retry.ok) {
             const retryData = await retry.json();
             return !!retryData.exists;
@@ -3193,7 +3242,7 @@ function notifyAuthChange() {
 function isLoggedIn() {
   const user = getLoggedInUser();
   if (!user) return false;
-  if (getAuthApiUrl() && !getSessionToken()) return false;
+  if ((__IS_LIVE_SITE || getAuthApiUrl()) && !getSessionToken()) return false;
   return true;
 }
 
@@ -4295,7 +4344,7 @@ function loadWalletState() {
 }
 
 function saveWalletState() {
-  if (usesServerWallet()) return;
+  if (requiresServerWallet()) return;
   const balances = {};
   ['USD', 'BTC', 'ETH', 'LTC'].forEach(currency => {
     balances[currency] = getWalletBalance(currency);
@@ -4305,7 +4354,7 @@ function saveWalletState() {
 }
 
 function hydrateWalletFromStorage() {
-  if (usesServerWallet()) {
+  if (requiresServerWallet()) {
     resetServerWalletCache();
     refreshServerWalletDisplay();
     return;
@@ -4425,7 +4474,7 @@ function getWalletOption(currency) {
 }
 
 function getWalletBalance(currency) {
-  if (usesServerWallet()) {
+  if (requiresServerWallet()) {
     if (!isLoggedIn()) return 0;
     return parseFloat(serverWalletBalances[currency]) || 0;
   }
@@ -4434,9 +4483,9 @@ function getWalletBalance(currency) {
 }
 
 function setWalletBalance(currency, value, persist = true) {
-  if (usesServerWallet() && !walletMutationAllowed) return;
+  if (requiresServerWallet() && !walletMutationAllowed) return;
   const num = parseFloat(value) || 0;
-  if (usesServerWallet()) {
+  if (requiresServerWallet()) {
     serverWalletBalances[currency] = num;
   }
   const formatted = formatWalletAmount(currency, num);
@@ -4605,7 +4654,7 @@ window.XythonWallet = {
       showToast(block, 'error');
       return { ok: false, error: block };
     }
-    if (usesServerWallet()) {
+    if (requiresServerWallet()) {
       return { ok: false, error: 'This game must use server playRound()' };
     }
     const amt = parseFloat(bet);
@@ -4617,7 +4666,7 @@ window.XythonWallet = {
     return { ok: true };
   },
   setBalance(currency, value, tx) {
-    if (usesServerWallet()) {
+    if (requiresServerWallet()) {
       return { ok: false, error: 'Balance is managed by the server' };
     }
     const cur = currency || this.getActiveCurrency();
@@ -5622,6 +5671,9 @@ function initCommon() {
     initGameInfoLoader();
     enhanceAccountNav();
     renderSelfExclusionBanner();
+    installProductionWalletGuard();
+    startTamperDetectionPolling();
+    startSessionVerifyPolling();
   };
 
   if (getAuthApiUrl()) {

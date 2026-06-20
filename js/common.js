@@ -29,6 +29,10 @@ function requiresServerWallet() {
 }
 
 const usesServerWallet = () => requiresServerWallet();
+
+// Set to false when maintenance is over.
+const SITE_MAINTENANCE_MODE = true;
+
 const PANEL_STORAGE_KEY = 'xython-panel-open';
 const WALLET_STORAGE_KEY = 'xython-wallet';
 const VAULT_STORAGE_KEY = 'xython-vault';
@@ -2444,6 +2448,7 @@ function persistAuthResponse(data) {
   saveUser(data.username);
   notifyAuthChange();
   renderAuthUI();
+  updateMaintenanceOverlay();
   return true;
 }
 
@@ -2460,6 +2465,14 @@ function hydrateSessionFromStorage() {
       isAdmin: !!parsed.isAdmin,
     };
   } catch { /* ignore */ }
+}
+
+function invalidateLocalSession() {
+  clearSession();
+  localStorage.removeItem(USER_STORAGE_KEY);
+  serverAuthProfile = { username: null, isAdmin: false };
+  notifyAuthChange();
+  updateMaintenanceOverlay();
 }
 
 function clearSession() {
@@ -5674,6 +5687,59 @@ function initCasinoThemeLoader() {
   document.head.appendChild(link);
 }
 
+function isAdminBypassMaintenance() {
+  if (isLoggedIn() && isAdmin()) return true;
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed?.isAdmin && parsed?.token) return true;
+  } catch { /* ignore */ }
+  return false;
+}
+
+function updateMaintenanceOverlay() {
+  if (!SITE_MAINTENANCE_MODE) {
+    document.getElementById('maintenanceOverlay')?.remove();
+    document.body.classList.remove('maintenance-active');
+    return;
+  }
+
+  if (isAdminBypassMaintenance()) {
+    document.getElementById('maintenanceOverlay')?.setAttribute('hidden', '');
+    document.body.classList.remove('maintenance-active');
+    return;
+  }
+
+  let overlay = document.getElementById('maintenanceOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'maintenanceOverlay';
+    overlay.className = 'maintenance-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'maintenanceTitle');
+    overlay.innerHTML = `
+      <div class="maintenance-overlay-card">
+        <p class="maintenance-overlay-kicker">NBD Casino</p>
+        <h1 class="maintenance-overlay-title" id="maintenanceTitle">Site closed for maintenance</h1>
+        <p class="maintenance-overlay-text">Back soon.</p>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+
+  overlay.removeAttribute('hidden');
+  document.body.classList.add('maintenance-active');
+}
+
+function initMaintenanceOverlay() {
+  if (!SITE_MAINTENANCE_MODE) return;
+  updateMaintenanceOverlay();
+  if (initMaintenanceOverlay.bound) return;
+  document.addEventListener('xython:auth-change', updateMaintenanceOverlay);
+  initMaintenanceOverlay.bound = true;
+}
+
 function initCommon() {
   if (location.protocol === 'http:' && /nbdcasino\.com$/i.test(location.hostname)) {
     location.replace(`https://${location.host}${location.pathname}${location.search}${location.hash}`);
@@ -5713,6 +5779,7 @@ function initCommon() {
     renderSelfExclusionBanner();
     installProductionWalletGuard();
     startSessionVerifyPolling();
+    initMaintenanceOverlay();
   };
 
   hydrateSessionFromStorage();

@@ -20,6 +20,7 @@ const state = {
   phase: 'idle',
   busy: false,
   history: [],
+  handPulseIndex: null,
 };
 
 const els = {};
@@ -201,8 +202,11 @@ function renderPlayerHands() {
     const slot = document.createElement('div');
     slot.className = 'bj-hand-slot';
     const isActive = index === state.activeHandIndex && state.phase === 'playing' && !hand.done;
+    const isWaiting = isSplit && !isActive && !hand.done;
     if (isActive) slot.classList.add('is-active');
     if (hand.done) slot.classList.add('is-done');
+    if (isWaiting) slot.classList.add('is-waiting');
+    if (index === state.handPulseIndex) slot.classList.add('is-focus-pop');
 
     if (isSplit) {
       const head = document.createElement('div');
@@ -243,6 +247,11 @@ function renderPlayerHands() {
         const status = document.createElement('div');
         status.className = 'bj-hand-slot-status bj-hand-slot-status--done';
         status.textContent = handValue(hand.cards) > 21 ? 'Bust' : 'Done';
+        slot.appendChild(status);
+      } else if (isWaiting) {
+        const status = document.createElement('div');
+        status.className = 'bj-hand-slot-status bj-hand-slot-status--waiting';
+        status.textContent = 'Waiting';
         slot.appendChild(status);
       }
     }
@@ -569,15 +578,23 @@ async function splitHand() {
 }
 
 async function advanceToNextHand() {
-  renderPlayerHands();
   const nextIndex = state.hands.findIndex((hand, index) => !hand.done && index > state.activeHandIndex);
   if (nextIndex >= 0) {
     state.activeHandIndex = nextIndex;
+    state.handPulseIndex = nextIndex;
     state.busy = false;
+    renderPlayerHands();
     updateUI();
+    setTimeout(() => {
+      if (state.handPulseIndex === nextIndex) {
+        state.handPulseIndex = null;
+        renderPlayerHands();
+      }
+    }, 650);
     return;
   }
 
+  renderPlayerHands();
   await dealerTurn();
 }
 

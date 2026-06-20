@@ -143,9 +143,40 @@
 }
 
 .ddb-page .bj-hand-slot.is-active {
-  border-color: rgba(251, 191, 36, 0.65);
-  background: linear-gradient(180deg, rgba(217, 119, 6, 0.18) 0%, rgba(217, 119, 6, 0.06) 100%);
-  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.22), 0 12px 32px rgba(180, 83, 9, 0.22);
+  border-color: rgba(251, 191, 36, 0.75);
+  background: linear-gradient(180deg, rgba(217, 119, 6, 0.24) 0%, rgba(217, 119, 6, 0.08) 100%);
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.28), 0 16px 36px rgba(180, 83, 9, 0.32);
+  transform: translateY(-8px) scale(1.05);
+}
+
+.ddb-page .bj-hand-slot.is-active.is-focus-pop {
+  animation: ddb-hand-focus-pop 0.6s cubic-bezier(0.34, 1.5, 0.64, 1) both;
+}
+
+@keyframes ddb-hand-focus-pop {
+  0% {
+    opacity: 0.55;
+    transform: translateY(8px) scale(0.92);
+    box-shadow: 0 0 0 rgba(217, 119, 6, 0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-14px) scale(1.1);
+    box-shadow: 0 0 0 2px rgba(253, 224, 71, 0.5), 0 24px 48px rgba(180, 83, 9, 0.45);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(-8px) scale(1.05);
+    box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.28), 0 16px 36px rgba(180, 83, 9, 0.32);
+  }
+}
+
+.ddb-page .bj-hand-slot-status {
+  color: #fbbf24;
+}
+
+.ddb-page .bj-hand-slot-status--waiting {
+  color: rgba(251, 191, 36, 0.38);
 }
 
 .ddb-page .bj-hand-slot-pill {
@@ -169,8 +200,4 @@
   color: #fff7ed;
   border-color: rgba(253, 224, 71, 0.42);
   box-shadow: 0 0 18px rgba(217, 119, 6, 0.2);
-}
-
-.ddb-page .bj-hand-slot-status {
-  color: #fbbf24;
 }

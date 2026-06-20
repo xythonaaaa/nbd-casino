@@ -421,19 +421,33 @@
   border-radius: 14px;
   border: 2px solid rgba(255, 255, 255, 0.06);
   background: rgba(0, 0, 0, 0.22);
-  transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
+  position: relative;
+  z-index: 1;
+  transition: border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease, opacity 0.3s ease, filter 0.3s ease;
 }
 
 .bj-hand-slot.is-active {
-  border-color: rgba(167, 139, 250, 0.65);
-  background: linear-gradient(180deg, rgba(124, 58, 237, 0.16) 0%, rgba(124, 58, 237, 0.06) 100%);
-  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.2), 0 12px 32px rgba(91, 33, 182, 0.22);
-  transform: translateY(-3px);
+  border-color: rgba(167, 139, 250, 0.75);
+  background: linear-gradient(180deg, rgba(124, 58, 237, 0.22) 0%, rgba(124, 58, 237, 0.08) 100%);
+  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.28), 0 16px 36px rgba(91, 33, 182, 0.32);
+  transform: translateY(-8px) scale(1.05);
+  z-index: 3;
+  opacity: 1;
+  filter: none;
 }
 
 .bj-hand-slot.is-done:not(.is-active) {
-  opacity: 0.68;
-  filter: saturate(0.85);
+  opacity: 0.48;
+  transform: scale(0.9) translateY(6px);
+  filter: saturate(0.55) brightness(0.82);
+  z-index: 0;
+}
+
+.bj-hand-slot.is-waiting:not(.is-active) {
+  opacity: 0.62;
+  transform: scale(0.94) translateY(2px);
+  filter: saturate(0.75);
+  z-index: 1;
 }
 
 .bj-hand-slot-head {
@@ -504,6 +518,32 @@
 
 .bj-hand-slot-status--done {
   color: rgba(255, 255, 255, 0.42);
+}
+
+.bj-hand-slot-status--waiting {
+  color: rgba(255, 255, 255, 0.32);
+}
+
+.bj-hand-slot.is-active.is-focus-pop {
+  animation: bj-hand-focus-pop 0.6s cubic-bezier(0.34, 1.5, 0.64, 1) both;
+}
+
+@keyframes bj-hand-focus-pop {
+  0% {
+    opacity: 0.55;
+    transform: translateY(8px) scale(0.92);
+    box-shadow: 0 0 0 rgba(124, 58, 237, 0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-14px) scale(1.1);
+    box-shadow: 0 0 0 2px rgba(196, 181, 253, 0.5), 0 24px 48px rgba(91, 33, 182, 0.45);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(-8px) scale(1.05);
+    box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.28), 0 16px 36px rgba(91, 33, 182, 0.32);
+  }
 }
 
 .bj-hand-slot-label {

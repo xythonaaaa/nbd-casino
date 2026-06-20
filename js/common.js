@@ -2017,6 +2017,7 @@ const LEADERBOARD_MAX = 500;
 const RECENT_BETS_MAX = 100;
 const HIGH_ROLLER_MIN = 100;
 const LEADERBOARD_POLL_MS = 5000;
+const LEADERBOARD_MAX_BET = 5000;
 
 let leaderboardCache = { wins: [], bets: {}, recentBets: [] };
 let leaderboardUsingServer = false;
@@ -2107,7 +2108,7 @@ async function recordLeaderboardRound({ game, bet, payout, mult, won }) {
 
   const betAmt = parseFloat(bet) || 0;
   const payAmt = parseFloat(payout) || 0;
-  if (betAmt > 1000) return;
+  if (betAmt > LEADERBOARD_MAX_BET) return;
   const hidden = !!loadUserSettings().privateMode;
   const user = hidden ? 'Hidden' : (getLoggedInUsername() || 'Player');
   if (!hidden && user.trim().toLowerCase() === 'tiddlesz') return;

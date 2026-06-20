@@ -62,7 +62,29 @@ function saveMessages(messages) {
 }
 
 function isReservedChatUser(username) {
-  return String(username || '').trim().toLowerCase() === 'system';
+  const name = String(username || '')
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim()
+    .toLowerCase();
+  return name === 'system' || name === 'admin' || name === 'moderator' || name === 'mod';
+}
+
+function looksLikeFakeTipAnnouncement(text) {
+  const clean = String(text || '').trim();
+  if (!clean) return false;
+  if (/tipped\s+(everyone|all|everybody|the\s+chat|chat|room)/i.test(clean)) return true;
+  if (/^[\w@.-]+\s+tipped\s+[\w@.-]+\s+\$?[\d,]+(?:\.\d+)?/i.test(clean)) return true;
+  return false;
+}
+
+function sanitizeChatMessages(messages) {
+  if (!Array.isArray(messages)) return [];
+  return messages.filter(msg => {
+    if (!msg || typeof msg.text !== 'string' || !msg.user) return false;
+    if (isReservedChatUser(msg.user) && msg.system !== true) return false;
+    return true;
+  });
 }
 
 function appendSystemChatMessage(text) {
@@ -73,6 +95,7 @@ function appendSystemChatMessage(text) {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     user: 'System',
     text: clean,
+    system: true,
     ts: Date.now(),
   });
   saveMessages(messages);
@@ -1105,7 +1128,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.url === '/api/chat' && req.method === 'GET') {
-    sendJson(res, 200, { messages: loadMessages() });
+    sendJson(res, 200, { messages: sanitizeChatMessages(loadMessages()) });
     return;
   }
 
@@ -1141,13 +1164,21 @@ const server = http.createServer((req, res) => {
         }
 
         const text = String(payload.text || '').trim().slice(0, 240);
-        const user = String(payload.user || '').trim().slice(0, 16);
+        const user = String(payload.user || '')
+          .normalize('NFKC')
+          .replace(/[\u200B-\u200D\uFEFF]/g, '')
+          .trim()
+          .slice(0, 16);
         if (!text || !user) {
           sendJson(res, 400, { error: 'Invalid message' });
           return;
         }
         if (isReservedChatUser(user)) {
           sendJson(res, 400, { error: 'Invalid username' });
+          return;
+        }
+        if (looksLikeFakeTipAnnouncement(text)) {
+          sendJson(res, 400, { error: 'Message not allowed' });
           return;
         }
 

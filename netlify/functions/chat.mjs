@@ -9,7 +9,29 @@ function isAdmin(username) {
 }
 
 function isReservedChatUser(username) {
-  return String(username || '').trim().toLowerCase() === 'system';
+  const name = String(username || '')
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim()
+    .toLowerCase();
+  return name === 'system' || name === 'admin' || name === 'moderator' || name === 'mod';
+}
+
+function looksLikeFakeTipAnnouncement(text) {
+  const clean = String(text || '').trim();
+  if (!clean) return false;
+  if (/tipped\s+(everyone|all|everybody|the\s+chat|chat|room)/i.test(clean)) return true;
+  if (/^[\w@.-]+\s+tipped\s+[\w@.-]+\s+\$?[\d,]+(?:\.\d+)?/i.test(clean)) return true;
+  return false;
+}
+
+function sanitizeChatMessages(messages) {
+  if (!Array.isArray(messages)) return [];
+  return messages.filter(msg => {
+    if (!msg || typeof msg.text !== 'string' || !msg.user) return false;
+    if (isReservedChatUser(msg.user) && msg.system !== true) return false;
+    return true;
+  });
 }
 
 export default async (req) => {
@@ -18,7 +40,7 @@ export default async (req) => {
   if (req.method === 'GET') {
     const messages = (await store.get('messages', { type: 'json' })) || [];
     return Response.json({
-      messages: Array.isArray(messages) ? messages : [],
+      messages: sanitizeChatMessages(Array.isArray(messages) ? messages : []),
     });
   }
 
@@ -52,12 +74,19 @@ export default async (req) => {
     }
 
     const text = String(payload.text || '').trim().slice(0, 240);
-    const user = String(payload.user || '').trim().slice(0, 16);
+    const user = String(payload.user || '')
+      .normalize('NFKC')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .trim()
+      .slice(0, 16);
     if (!text || !user) {
       return Response.json({ error: 'Invalid message' }, { status: 400 });
     }
     if (isReservedChatUser(user)) {
       return Response.json({ error: 'Invalid username' }, { status: 400 });
+    }
+    if (looksLikeFakeTipAnnouncement(text)) {
+      return Response.json({ error: 'Message not allowed' }, { status: 400 });
     }
 
     const existing = (await store.get('messages', { type: 'json' })) || [];

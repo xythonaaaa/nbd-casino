@@ -1299,6 +1299,36 @@ function getChatApiUrl() {
   return null;
 }
 
+function normalizeChatUsername(username) {
+  return String(username || '')
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim()
+    .slice(0, 16);
+}
+
+function isReservedChatUser(username) {
+  const name = normalizeChatUsername(username).toLowerCase();
+  return name === 'system' || name === 'admin' || name === 'moderator' || name === 'mod';
+}
+
+function looksLikeFakeTipAnnouncement(text) {
+  const clean = String(text || '').trim();
+  if (!clean) return false;
+  if (/tipped\s+(everyone|all|everybody|the\s+chat|chat|room)/i.test(clean)) return true;
+  if (/^[\w@.-]+\s+tipped\s+[\w@.-]+\s+\$?[\d,]+(?:\.\d+)?/i.test(clean)) return true;
+  return false;
+}
+
+function sanitizeChatMessages(messages) {
+  if (!Array.isArray(messages)) return [];
+  return messages.filter(msg => {
+    if (!msg || typeof msg.text !== 'string' || !msg.user) return false;
+    if (isReservedChatUser(msg.user) && msg.system !== true) return false;
+    return true;
+  });
+}
+
 function loadChatMessagesLocal() {
   try {
     const raw = localStorage.getItem(CHAT_STORAGE_KEY);
@@ -1327,7 +1357,8 @@ async function fetchChatFromServer() {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
     const data = await res.json();
-    return Array.isArray(data.messages) ? data.messages : null;
+    const messages = Array.isArray(data.messages) ? data.messages : null;
+    return messages ? sanitizeChatMessages(messages) : null;
   } catch {
     return null;
   }
@@ -1385,6 +1416,7 @@ async function deleteChatMessage(messageId) {
 }
 
 function loadChatMessages() {
+  if (chatUsingServer) return chatCache;
   return chatCache.length ? chatCache : loadChatMessagesLocal();
 }
 
@@ -1393,6 +1425,7 @@ async function refreshChatMessages() {
   if (remote !== null) {
     chatUsingServer = true;
     chatCache = remote;
+    try { localStorage.removeItem(CHAT_STORAGE_KEY); } catch { /* ignore */ }
     renderChat();
     return chatCache;
   }
@@ -1420,26 +1453,30 @@ function getChatChannel() {
 }
 
 async function addChatMessage(username, text) {
+  const user = normalizeChatUsername(username);
   const clean = text.trim().slice(0, CHAT_MAX_LENGTH);
-  if (!clean || !username) return loadChatMessages();
+  if (!clean || !user) return { ok: false, error: 'Invalid message' };
+  if (isReservedChatUser(user)) return { ok: false, error: 'Invalid username' };
+  if (looksLikeFakeTipAnnouncement(clean)) return { ok: false, error: 'Message not allowed' };
 
   if (getChatApiUrl()) {
-    const posted = await postChatToServer(username, clean);
+    const posted = await postChatToServer(user, clean);
     if (posted) {
       await refreshChatMessages();
-      return chatCache;
+      return { ok: true };
     }
+    return { ok: false, error: 'Could not send message' };
   }
 
   const messages = loadChatMessagesLocal();
   messages.push({
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-    user: username,
+    user,
     text: clean,
     ts: Date.now(),
   });
   saveChatMessages(messages);
-  return messages;
+  return { ok: true };
 }
 
 function getChatEmptyMessage() {
@@ -1543,7 +1580,7 @@ function renderChatMessages(container) {
   }
   const showDelete = isAdmin();
   container.innerHTML = messages.map(msg => {
-    const isSystem = msg.user === 'System';
+    const isSystem = msg.system === true;
     const deleteBtn = showDelete && msg.id && !isSystem
       ? `<button type="button" class="chat-delete-btn" data-message-id="${escapeHtml(msg.id)}" aria-label="Delete message" title="Delete message">&times;</button>`
       : '';
@@ -1690,9 +1727,12 @@ function wireChatInput(input, sendBtn) {
     }
 
     input.disabled = true;
-    addChatMessage(getPublicUsername(), text).finally(() => {
+    addChatMessage(getPublicUsername(), text).then(result => {
       input.disabled = !isLoggedIn();
       input.value = '';
+      if (result?.ok === false) {
+        showToast(result.error || 'Could not send message', 'error');
+      }
     });
   }
 

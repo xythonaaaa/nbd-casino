@@ -3,6 +3,9 @@ import {
   CHAT_MESSAGES_KEY,
   CHAT_MAX_MESSAGES,
   isReservedChatUser,
+  looksLikeFakeTipAnnouncement,
+  normalizeChatUsername,
+  sanitizeChatMessages,
 } from '../lib/chat-store.js';
 import { json, methodNotAllowed, corsOptions, parseJson } from '../lib/http.js';
 import { kvGet, kvSet } from '../lib/kv.js';
@@ -18,7 +21,7 @@ export async function onRequest(context) {
   if (request.method === 'GET') {
     const messages = (await kvGet(kv, STORE_KEY, [])) || [];
     return json({
-      messages: Array.isArray(messages) ? messages : [],
+      messages: sanitizeChatMessages(Array.isArray(messages) ? messages : []),
     });
   }
 
@@ -48,12 +51,15 @@ export async function onRequest(context) {
     }
 
     const text = String(payload.text || '').trim().slice(0, 240);
-    const user = String(payload.user || '').trim().slice(0, 16);
+    const user = normalizeChatUsername(payload.user);
     if (!text || !user) {
       return json({ error: 'Invalid message' }, 400);
     }
     if (isReservedChatUser(user)) {
       return json({ error: 'Invalid username' }, 400);
+    }
+    if (looksLikeFakeTipAnnouncement(text)) {
+      return json({ error: 'Message not allowed' }, 400);
     }
 
     const existing = (await kvGet(kv, STORE_KEY, [])) || [];

@@ -36,9 +36,24 @@ let cachedAccountStatus = null;
 let walletMutationAllowed = false;
 let serverRakebackPending = 0;
 let serverLastDailyClaimAt = 0;
+const SERVER_WALLET_DEFAULT = { USD: 0, BTC: 0, ETH: 0, LTC: 0 };
+let serverWalletBalances = { ...SERVER_WALLET_DEFAULT };
 
 function usesServerWallet() {
-  return !!getWalletApiUrl() && isLoggedIn();
+  return !!getWalletApiUrl();
+}
+
+function resetServerWalletCache() {
+  serverWalletBalances = { ...SERVER_WALLET_DEFAULT };
+}
+
+function refreshServerWalletDisplay() {
+  if (!usesServerWallet()) return;
+  walletMutationAllowed = true;
+  WALLET_CURRENCIES.forEach(currency => {
+    setWalletBalance(currency, serverWalletBalances[currency] ?? 0, false);
+  });
+  walletMutationAllowed = false;
 }
 
 function applyServerWalletFromResponse(data) {
@@ -48,9 +63,10 @@ function applyServerWalletFromResponse(data) {
   const balances = data.balances || {};
   WALLET_CURRENCIES.forEach(currency => {
     const total = data.combined?.[currency] ?? getCombinedServerTotal(grants, balances, currency);
+    serverWalletBalances[currency] = total;
     setWalletBalance(currency, total, false);
   });
-  saveWalletState();
+  if (!usesServerWallet()) saveWalletState();
   const username = getLoggedInUsername();
   if (username) markServerWalletSynced(username, grants, balances);
   if (data.rakebackPending != null) {
@@ -3107,6 +3123,8 @@ function clearUser() {
   }
   clearSession();
   localStorage.removeItem(USER_STORAGE_KEY);
+  resetServerWalletCache();
+  refreshServerWalletDisplay();
   notifyAuthChange();
 }
 
@@ -4221,6 +4239,7 @@ function loadWalletState() {
 }
 
 function saveWalletState() {
+  if (usesServerWallet()) return;
   const balances = {};
   ['USD', 'BTC', 'ETH', 'LTC'].forEach(currency => {
     balances[currency] = getWalletBalance(currency);
@@ -4230,6 +4249,11 @@ function saveWalletState() {
 }
 
 function hydrateWalletFromStorage() {
+  if (usesServerWallet()) {
+    resetServerWalletCache();
+    refreshServerWalletDisplay();
+    return;
+  }
   const state = loadWalletState();
   Object.entries(state.balances).forEach(([currency, value]) => {
     setWalletBalance(currency, value, false);
@@ -4345,18 +4369,26 @@ function getWalletOption(currency) {
 }
 
 function getWalletBalance(currency) {
+  if (usesServerWallet()) {
+    if (!isLoggedIn()) return 0;
+    return parseFloat(serverWalletBalances[currency]) || 0;
+  }
   const option = getWalletOption(currency);
   return parseFloat(option?.dataset.amount || '0') || 0;
 }
 
 function setWalletBalance(currency, value, persist = true) {
   if (usesServerWallet() && !walletMutationAllowed) return;
-  const formatted = formatWalletAmount(currency, value);
+  const num = parseFloat(value) || 0;
+  if (usesServerWallet()) {
+    serverWalletBalances[currency] = num;
+  }
+  const formatted = formatWalletAmount(currency, num);
   document.querySelectorAll(`.wallet-option[data-currency="${currency}"]`).forEach(option => {
     option.dataset.amount = formatted;
     const display = currency === 'USD'
-      ? `$${formatWalletDisplay(currency, value)}`
-      : formatWalletDisplay(currency, value);
+      ? `$${formatWalletDisplay(currency, num)}`
+      : formatWalletDisplay(currency, num);
     option.textContent = `${currency} — ${display}`;
   });
 
@@ -4364,7 +4396,7 @@ function setWalletBalance(currency, value, persist = true) {
   const amountEl = document.getElementById('walletAmount');
   const iconEl = document.querySelector('.wallet-currency-icon');
   if (active?.dataset.currency === currency) {
-    applyWalletHeaderDisplay(currency, value);
+    applyWalletHeaderDisplay(currency, num);
   }
 
   if (persist) saveWalletState();
@@ -4529,7 +4561,7 @@ window.XythonWallet = {
     return { ok: true };
   },
   setBalance(currency, value, tx) {
-    if (usesServerWallet() && !walletMutationAllowed) {
+    if (usesServerWallet()) {
       return { ok: false, error: 'Balance is managed by the server' };
     }
     const cur = currency || this.getActiveCurrency();

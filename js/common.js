@@ -2437,6 +2437,19 @@ function saveSession(token, username, expiresAt, isAdminFlag = false) {
   }));
 }
 
+function hydrateSessionFromStorage() {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.token) return;
+    serverAuthProfile = {
+      username: parsed.username || null,
+      isAdmin: !!parsed.isAdmin,
+    };
+  } catch { /* ignore */ }
+}
+
 function clearSession() {
   localStorage.removeItem(SESSION_STORAGE_KEY);
   serverAuthProfile = { username: null, isAdmin: false };
@@ -2481,28 +2494,6 @@ function installProductionWalletGuard() {
     writable: false,
     configurable: false,
   });
-}
-
-let fetchTamperDetected = false;
-
-function detectClientTampering() {
-  if (!__IS_LIVE_SITE || fetchTamperDetected) return false;
-  if (window.fetch === __nativeFetch) return false;
-  fetchTamperDetected = true;
-  clearSession();
-  if (localStorage.getItem(USER_STORAGE_KEY)) clearUser();
-  localStorage.removeItem(WALLET_STORAGE_KEY);
-  resetServerWalletCache();
-  refreshServerWalletDisplay();
-  renderAuthUI();
-  showToast('Security check failed. Please log in again.', 'error');
-  return true;
-}
-
-function startTamperDetectionPolling() {
-  if (!__IS_LIVE_SITE) return;
-  detectClientTampering();
-  setInterval(detectClientTampering, 5000);
 }
 
 function startSessionVerifyPolling() {
@@ -5690,10 +5681,10 @@ function initCommon() {
     enhanceAccountNav();
     renderSelfExclusionBanner();
     installProductionWalletGuard();
-    startTamperDetectionPolling();
     startSessionVerifyPolling();
   };
 
+  hydrateSessionFromStorage();
   if (getAuthApiUrl()) {
     verifyServerSession().finally(finishInit);
   } else {

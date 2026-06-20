@@ -21,9 +21,77 @@ const state = {
   busy: false,
   history: [],
   handPulseIndex: null,
+  sessionId: null,
 };
 
 const els = {};
+
+function bjUsesServer() {
+  return window.XythonWallet?.usesServerWallet?.() ?? false;
+}
+
+async function bjOpenSession(totalWager, detail) {
+  if (!bjUsesServer()) {
+    const currency = window.XythonWallet.getActiveCurrency();
+    const balance = window.XythonWallet.getBalance(currency);
+    return window.XythonWallet.setBalance(currency, balance - totalWager, {
+      type: 'bet',
+      label: GAME_LABEL,
+      detail,
+      game: GAME_ID,
+    });
+  }
+  const result = await window.XythonWallet.startSession({
+    game: 'dd-blackjack',
+    bet: totalWager,
+    currency: window.XythonWallet.getActiveCurrency(),
+    tx: { label: GAME_LABEL, detail, game: GAME_ID },
+  });
+  if (result?.ok) state.sessionId = result.sessionId;
+  return result;
+}
+
+async function bjDebit(amount, detail) {
+  if (!bjUsesServer()) {
+    const currency = window.XythonWallet.getActiveCurrency();
+    const balance = window.XythonWallet.getBalance(currency);
+    return window.XythonWallet.setBalance(currency, balance - amount, {
+      type: 'bet',
+      label: GAME_LABEL,
+      detail,
+      game: GAME_ID,
+    });
+  }
+  return window.XythonWallet.sessionDebit({
+    sessionId: state.sessionId,
+    amount,
+    tx: { label: GAME_LABEL, detail, game: GAME_ID },
+  });
+}
+
+async function bjSettle(payout, detail) {
+  if (!bjUsesServer()) {
+    if (payout > 0) {
+      const currency = window.XythonWallet.getActiveCurrency();
+      const balance = window.XythonWallet.getBalance(currency);
+      await window.XythonWallet.setBalance(currency, balance + payout, {
+        type: 'win',
+        label: GAME_LABEL,
+        detail,
+        game: GAME_ID,
+      });
+    }
+    state.sessionId = null;
+    return { ok: true };
+  }
+  const result = await window.XythonWallet.sessionSettle({
+    sessionId: state.sessionId,
+    payout,
+    tx: { label: GAME_LABEL, detail, game: GAME_ID },
+  });
+  state.sessionId = null;
+  return result;
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   initCommon();
@@ -436,12 +504,7 @@ async function placeBet() {
     return;
   }
 
-  const debitResult = window.XythonWallet?.setBalance(currency, balance - bet, {
-    type: 'bet',
-    label: GAME_LABEL,
-    detail: `Bet $${bet.toFixed(2)}`,
-    game: GAME_ID,
-  });
+  const debitResult = await bjOpenSession(bet, `Bet $${bet.toFixed(2)}`);
   if (debitResult?.ok === false) {
     setMessage(debitResult.error, 'lose');
     return;
@@ -478,9 +541,9 @@ async function placeBet() {
     await wait(500);
     await revealDealerHoleCard();
     if (isBlackjack(state.dealer)) {
-      finishRound('push', 'Both blackjack — push');
+      await finishRound('push', 'Both blackjack — push');
     } else {
-      finishRound('blackjack');
+      await finishRound('blackjack');
     }
     updateUI();
   }
@@ -527,12 +590,7 @@ async function splitHand() {
   state.busy = true;
   updateUI();
 
-  const debitResult = window.XythonWallet?.setBalance(currency, balance - splitBet, {
-    type: 'bet',
-    label: GAME_LABEL,
-    detail: `Split — $${splitBet.toFixed(2)}`,
-    game: GAME_ID,
-  });
+  const debitResult = await bjDebit(splitBet, `Split — $${splitBet.toFixed(2)}`);
   if (debitResult?.ok === false) {
     state.busy = false;
     updateUI();
@@ -608,12 +666,7 @@ async function doubleDown() {
 
   state.busy = true;
   updateUI();
-  const debitResult = window.XythonWallet?.setBalance(currency, balance - add, {
-    type: 'bet',
-    label: GAME_LABEL,
-    detail: `Double down — $${add.toFixed(2)}`,
-    game: GAME_ID,
-  });
+  const debitResult = await bjDebit(add, `Double down — $${add.toFixed(2)}`);
   if (debitResult?.ok === false) {
     state.busy = false;
     updateUI();
@@ -650,7 +703,7 @@ async function dealerTurn() {
     await wait(DEAL_DELAY);
   }
 
-  finishHands();
+  await finishHands();
   updateUI();
 }
 
@@ -666,7 +719,7 @@ function resolveHandResult(hand, dealerTotal) {
   return { result: 'push', payout: wager, wager };
 }
 
-function finishHands() {
+async function finishHands() {
   state.phase = 'idle';
   state.busy = false;
   updateDealerScore(false);
@@ -720,17 +773,9 @@ function finishHands() {
   pushHistory({ result, mult });
   showResultPopup(result, totalPayout, totalWager);
 
-  if (totalPayout > 0) {
-    const balance = window.XythonWallet?.getBalance(currency) ?? 0;
-    window.XythonWallet?.setBalance(currency, balance + totalPayout, {
-      type: 'win',
-      label: GAME_LABEL,
-      detail: result === 'push'
-        ? `Push — $${totalPayout.toFixed(2)} returned`
-        : `Win — $${totalPayout.toFixed(2)}`,
-      game: GAME_ID,
-    });
-  }
+  await bjSettle(totalPayout, result === 'push'
+    ? `Push — $${totalPayout.toFixed(2)} returned`
+    : `Win — $${totalPayout.toFixed(2)}`);
 
   const won = totalPayout > totalWager ? true : totalPayout < totalWager ? false : null;
   window.XythonStats?.recordRound?.(totalWager, won, { game: GAME_ID, payout: totalPayout, mult });
@@ -740,7 +785,7 @@ function finishHands() {
   updateUI();
 }
 
-function finishRound(result, msg) {
+async function finishRound(result, msg) {
   state.phase = 'idle';
   state.busy = false;
   updateDealerScore(false);
@@ -769,17 +814,9 @@ function finishRound(result, msg) {
   pushHistory({ result, mult });
   showResultPopup(result, payout, wager);
 
-  if (payout > 0) {
-    const balance = window.XythonWallet?.getBalance(currency) ?? 0;
-    window.XythonWallet?.setBalance(currency, balance + payout, {
-      type: 'win',
-      label: GAME_LABEL,
-      detail: result === 'push'
-        ? `Push — $${payout.toFixed(2)} returned`
-        : `${result === 'blackjack' ? 'Blackjack' : 'Win'} — $${payout.toFixed(2)}`,
-      game: GAME_ID,
-    });
-  }
+  await bjSettle(payout, result === 'push'
+    ? `Push — $${payout.toFixed(2)} returned`
+    : `${result === 'blackjack' ? 'Blackjack' : 'Win'} — $${payout.toFixed(2)}`);
 
   const won = result === 'blackjack' || result === 'win'
     ? true

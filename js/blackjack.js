@@ -17,9 +17,87 @@ const state = {
   phase: 'idle',
   busy: false,
   handPulseIndex: null,
+  sessionId: null,
 };
 
 const els = {};
+
+function bjUsesServer() {
+  return window.XythonWallet?.usesServerWallet?.() ?? false;
+}
+
+async function bjOpenSession(totalWager, detail) {
+  if (!bjUsesServer()) {
+    const currency = window.XythonWallet.getActiveCurrency();
+    const balance = window.XythonWallet.getBalance(currency);
+    return window.XythonWallet.setBalance(currency, balance - totalWager, {
+      type: 'bet',
+      label: 'Blackjack',
+      detail,
+      game: 'blackjack',
+    });
+  }
+  const result = await window.XythonWallet.startSession({
+    game: 'blackjack',
+    bet: totalWager,
+    currency: window.XythonWallet.getActiveCurrency(),
+    tx: { label: 'Blackjack', detail, game: 'blackjack' },
+  });
+  if (result?.ok) state.sessionId = result.sessionId;
+  return result;
+}
+
+async function bjDebit(amount, detail) {
+  if (!bjUsesServer()) {
+    const currency = window.XythonWallet.getActiveCurrency();
+    const balance = window.XythonWallet.getBalance(currency);
+    return window.XythonWallet.setBalance(currency, balance - amount, {
+      type: 'bet',
+      label: 'Blackjack',
+      detail,
+      game: 'blackjack',
+    });
+  }
+  return window.XythonWallet.sessionDebit({
+    sessionId: state.sessionId,
+    amount,
+    tx: { label: 'Blackjack', detail, game: 'blackjack' },
+  });
+}
+
+async function bjCredit(amount, detail) {
+  if (!amount) return { ok: true };
+  if (!bjUsesServer()) {
+    const currency = window.XythonWallet.getActiveCurrency();
+    const balance = window.XythonWallet.getBalance(currency);
+    return window.XythonWallet.setBalance(currency, balance + amount, {
+      type: 'win',
+      label: 'Blackjack',
+      detail,
+      game: 'blackjack',
+    });
+  }
+  return window.XythonWallet.sessionCredit({
+    sessionId: state.sessionId,
+    amount,
+    tx: { label: 'Blackjack', detail, game: 'blackjack' },
+  });
+}
+
+async function bjSettle(payout, detail) {
+  if (!bjUsesServer()) {
+    if (payout > 0) await bjCredit(payout, detail);
+    state.sessionId = null;
+    return { ok: true };
+  }
+  const result = await window.XythonWallet.sessionSettle({
+    sessionId: state.sessionId,
+    payout,
+    tx: { label: 'Blackjack', detail, game: 'blackjack' },
+  });
+  state.sessionId = null;
+  return result;
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   initCommon();
@@ -429,20 +507,14 @@ function evaluate21Plus3(p1, p2, dealerUp) {
   return null;
 }
 
-function paySideBet(bet, result, currency) {
+async function paySideBet(bet, result, currency) {
   if (!bet || !result) return 0;
   const payout = bet * (result.mult + 1);
-  const balance = window.XythonWallet?.getBalance(currency) ?? 0;
-  window.XythonWallet?.setBalance(currency, balance + payout, {
-    type: 'win',
-    label: 'Blackjack',
-    detail: `${result.name} side bet — $${payout.toFixed(2)}`,
-    game: 'blackjack',
-  });
+  await bjCredit(payout, `${result.name} side bet — $${payout.toFixed(2)}`);
   return payout;
 }
 
-function resolveSideBets() {
+async function resolveSideBets() {
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
   const wins = [];
   let totalSidePayout = 0;
@@ -452,7 +524,7 @@ function resolveSideBets() {
     if (!main || main.cards.length < 2) return { wins, totalSidePayout };
     const result = evaluatePerfectPairs(main.cards[0], main.cards[1]);
     if (result) {
-      const payout = paySideBet(state.sideBets.perfectPairs, result, currency);
+      const payout = await paySideBet(state.sideBets.perfectPairs, result, currency);
       totalSidePayout += payout;
       wins.push(`Perfect Pairs ${result.name} ${result.mult}:1 (+$${payout.toFixed(2)})`);
     }
@@ -463,7 +535,7 @@ function resolveSideBets() {
     if (!main || main.cards.length < 2) return { wins, totalSidePayout };
     const result = evaluate21Plus3(main.cards[0], main.cards[1], state.dealer[0]);
     if (result) {
-      const payout = paySideBet(state.sideBets.twentyOnePlus3, result, currency);
+      const payout = await paySideBet(state.sideBets.twentyOnePlus3, result, currency);
       totalSidePayout += payout;
       wins.push(`21+3 ${result.name} ${result.mult}:1 (+$${payout.toFixed(2)})`);
     }
@@ -522,12 +594,7 @@ async function placeBet() {
     return;
   }
 
-  const debitResult = window.XythonWallet?.setBalance(currency, balance - totalWager, {
-    type: 'bet',
-    label: 'Blackjack',
-    detail: `Bet $${totalWager.toFixed(2)}`,
-    game: 'blackjack',
-  });
+  const debitResult = await bjOpenSession(totalWager, `Bet $${totalWager.toFixed(2)}`);
   if (debitResult?.ok === false) {
     setMessage(debitResult.error, 'lose');
     return;
@@ -554,7 +621,7 @@ async function placeBet() {
   await wait(DEAL_DELAY);
   appendDealerCard(draw(), true);
 
-  const sideResult = resolveSideBets();
+  const sideResult = await resolveSideBets();
   if (sideResult.wins.length) {
     setMessage(sideResult.wins.join(' • '), 'win');
     await wait(900);
@@ -570,9 +637,9 @@ async function placeBet() {
     await wait(500);
     await revealDealerHoleCard();
     if (isBlackjack(state.dealer)) {
-      finishRound('push', 'Both blackjack — push');
+      await finishRound('push', 'Both blackjack — push');
     } else {
-      finishRound('blackjack');
+      await finishRound('blackjack');
     }
     updateUI();
   }
@@ -619,12 +686,7 @@ async function splitHand() {
   state.busy = true;
   updateUI();
 
-  const debitResult = window.XythonWallet?.setBalance(currency, balance - splitBet, {
-    type: 'bet',
-    label: 'Blackjack',
-    detail: `Split — $${splitBet.toFixed(2)}`,
-    game: 'blackjack',
-  });
+  const debitResult = await bjDebit(splitBet, `Split — $${splitBet.toFixed(2)}`);
   if (debitResult?.ok === false) {
     state.busy = false;
     updateUI();
@@ -703,12 +765,7 @@ async function doubleDown() {
 
   state.busy = true;
   updateUI();
-  const debitResult = window.XythonWallet?.setBalance(currency, balance - hand.bet, {
-    type: 'bet',
-    label: 'Blackjack',
-    detail: `Double down — $${hand.bet.toFixed(2)}`,
-    game: 'blackjack',
-  });
+  const debitResult = await bjDebit(hand.bet, `Double down — $${hand.bet.toFixed(2)}`);
   if (debitResult?.ok === false) {
     state.busy = false;
     updateUI();
@@ -744,7 +801,7 @@ async function dealerTurn() {
     await wait(DEAL_DELAY);
   }
 
-  finishHands();
+  await finishHands();
   updateUI();
 }
 
@@ -759,13 +816,12 @@ function resolveHandResult(hand, dealerTotal) {
   return { result: 'push', payout: wager, wager };
 }
 
-function finishHands() {
+async function finishHands() {
   state.phase = 'idle';
   state.busy = false;
   updateDealerScore(false);
   renderPlayerHands();
 
-  const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
   const dealerTotal = handValue(state.dealer);
   const outcomes = state.hands.map((hand, index) => ({
     index,
@@ -806,17 +862,9 @@ function finishHands() {
 
   showResultPopup(result, totalPayout, totalWager);
 
-  if (totalPayout > 0) {
-    const balance = window.XythonWallet?.getBalance(currency) ?? 0;
-    window.XythonWallet?.setBalance(currency, balance + totalPayout, {
-      type: 'win',
-      label: 'Blackjack',
-      detail: result === 'push'
-        ? `Push — $${totalPayout.toFixed(2)} returned`
-        : `Win — $${totalPayout.toFixed(2)}`,
-      game: 'blackjack',
-    });
-  }
+  await bjSettle(totalPayout, result === 'push'
+    ? `Push — $${totalPayout.toFixed(2)} returned`
+    : `Win — $${totalPayout.toFixed(2)}`);
 
   const sideWager = (state.sideBets?.perfectPairs || 0) + (state.sideBets?.twentyOnePlus3 || 0);
   const allWager = totalWager + sideWager;
@@ -828,7 +876,7 @@ function finishHands() {
   updateUI();
 }
 
-function finishRound(result, msg) {
+async function finishRound(result, msg) {
   state.phase = 'idle';
   state.busy = false;
   updateDealerScore(false);
@@ -855,17 +903,9 @@ function finishRound(result, msg) {
 
   showResultPopup(result, payout, wager);
 
-  if (payout > 0) {
-    const balance = window.XythonWallet?.getBalance(currency) ?? 0;
-    window.XythonWallet?.setBalance(currency, balance + payout, {
-      type: 'win',
-      label: 'Blackjack',
-      detail: result === 'push'
-        ? `Push — $${payout.toFixed(2)} returned`
-        : `${result === 'blackjack' ? 'Blackjack' : 'Win'} — $${payout.toFixed(2)}`,
-      game: 'blackjack',
-    });
-  }
+  await bjSettle(payout, result === 'push'
+    ? `Push — $${payout.toFixed(2)} returned`
+    : `${result === 'blackjack' ? 'Blackjack' : 'Win'} — $${payout.toFixed(2)}`);
 
   const sideWager = (state.sideBets?.perfectPairs || 0) + (state.sideBets?.twentyOnePlus3 || 0);
   const totalWager = wager + sideWager;

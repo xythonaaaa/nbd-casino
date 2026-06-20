@@ -370,7 +370,7 @@ function showResult(num) {
   els.result.className = 'rl-result is-' + getNumberColor(num);
 }
 
-function spin() {
+async function spin() {
   if (state.spinning) return;
 
   if (!window.XythonAuth?.requireAuth?.('register')) {
@@ -391,18 +391,6 @@ function spin() {
     return;
   }
 
-  const debitResult = window.XythonWallet?.setBalance(currency, balance - total, {
-    type: 'bet',
-    label: 'Roulette',
-    detail: `$${total.toFixed(2)}`,
-    game: 'roulette',
-  });
-  if (debitResult?.ok === false) {
-    state.locked = false;
-    updateUI();
-    return;
-  }
-
   state.lastRound = {
     bets: { ...state.bets },
     betStack: state.betStack.map(b => ({ ...b })),
@@ -412,8 +400,28 @@ function spin() {
   setMessage('');
   updateUI();
 
-  const resultIndex = Math.floor(Math.random() * WHEEL_ORDER.length);
-  const result = WHEEL_ORDER[resultIndex];
+  const betsSnapshot = { ...state.bets };
+  const play = await window.XythonWallet?.playRound?.({
+    game: 'roulette',
+    bet: total,
+    currency,
+    params: { bets: betsSnapshot },
+    tx: {
+      label: 'Roulette',
+      detail: `$${total.toFixed(2)}`,
+      game: 'roulette',
+    },
+  });
+
+  if (!play?.ok) {
+    state.spinning = false;
+    setMessage(play?.error || 'Could not place bet', 'lose');
+    updateUI();
+    return;
+  }
+
+  const result = play.outcome.result;
+  const resultIndex = WHEEL_ORDER.indexOf(result);
   const slotAngleDeg = 360 / WHEEL_ORDER.length;
   const spins = 5 + Math.floor(Math.random() * 3);
   const targetOffset = 360 - (resultIndex + 0.5) * slotAngleDeg;
@@ -422,7 +430,6 @@ function spin() {
   const startRotation = state.rotation;
   const duration = 4200;
   const startTime = performance.now();
-  const betsSnapshot = { ...state.bets };
 
   function frame(now) {
     const t = Math.min(1, (now - startTime) / duration);
@@ -435,37 +442,19 @@ function spin() {
     } else {
       state.rotation = endRotation;
       drawWheel(state.rotation);
-      finishSpin(result, betsSnapshot, currency);
+      finishSpin(result, betsSnapshot, currency, play.payout, play.outcome.wins || []);
     }
   }
 
   requestAnimationFrame(frame);
 }
 
-function finishSpin(result, bets, currency) {
+function finishSpin(result, bets, currency, totalPayout, winSpots) {
   state.spinning = false;
   showResult(result);
   addHistory(result);
 
-  let totalPayout = 0;
-  const wins = [];
-
-  Object.entries(bets).forEach(([spot, amount]) => {
-    if (betWins(spot, result)) {
-      const payout = amount * betMultiplier(spot);
-      totalPayout += payout;
-      wins.push(spot);
-    }
-  });
-
   if (totalPayout > 0) {
-    const balance = window.XythonWallet?.getBalance(currency) ?? 0;
-    window.XythonWallet?.setBalance(currency, balance + totalPayout, {
-      type: 'win',
-      label: 'Roulette',
-      detail: `${result} — $${totalPayout.toFixed(2)}`,
-      game: 'roulette',
-    });
     setMessage('');
     showWinPopup(result, totalPayout, currency);
   } else {

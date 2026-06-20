@@ -210,9 +210,142 @@ export function resolveGameRound(game, bet, params = {}) {
         data: { picks: unique, drawn, hits, multiplier, won: multiplier > 0 },
       };
     }
+    case 'roulette': {
+      const bets = params.bets && typeof params.bets === 'object' ? params.bets : {};
+      const entries = Object.entries(bets).filter(([, v]) => (parseFloat(v) || 0) > 0);
+      if (!entries.length) return { error: 'Place chips on the table first' };
+      const wager = entries.reduce((sum, [, v]) => sum + (parseFloat(v) || 0), 0);
+      if (Math.abs(wager - amt) > 0.01) return { error: 'Bet mismatch' };
+      const result = WHEEL_ORDER[Math.floor(random() * WHEEL_ORDER.length)];
+      let totalPayout = 0;
+      const wins = [];
+      entries.forEach(([spot, amount]) => {
+        const betAmt = parseFloat(amount) || 0;
+        if (rouletteBetWins(spot, result)) {
+          const payout = betAmt * rouletteBetMultiplier(spot);
+          totalPayout += payout;
+          wins.push(spot);
+        }
+      });
+      return {
+        payout: totalPayout,
+        data: { result, wins, bets: Object.fromEntries(entries), won: totalPayout > amt },
+      };
+    }
     default:
       return { error: 'Unsupported game' };
   }
+}
+
+const WHEEL_ORDER = [
+  0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5,
+  24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26,
+];
+
+const ROULETTE_RED = new Set([
+  1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36,
+]);
+
+function rouletteColor(n) {
+  if (n === 0) return 'green';
+  return ROULETTE_RED.has(n) ? 'red' : 'black';
+}
+
+function rouletteBetWins(spot, result) {
+  if (spot.startsWith('num-')) return result === parseInt(spot.slice(4), 10);
+  if (spot === 'red') return rouletteColor(result) === 'red';
+  if (spot === 'black') return rouletteColor(result) === 'black';
+  if (spot === 'even') return result !== 0 && result % 2 === 0;
+  if (spot === 'odd') return result !== 0 && result % 2 === 1;
+  if (spot === 'low') return result >= 1 && result <= 18;
+  if (spot === 'high') return result >= 19 && result <= 36;
+  if (spot === 'dozen-1') return result >= 1 && result <= 12;
+  if (spot === 'dozen-2') return result >= 13 && result <= 24;
+  if (spot === 'dozen-3') return result >= 25 && result <= 36;
+  if (spot === 'col-1') return result !== 0 && result % 3 === 0;
+  if (spot === 'col-2') return result !== 0 && result % 3 === 2;
+  if (spot === 'col-3') return result !== 0 && result % 3 === 1;
+  return false;
+}
+
+function rouletteBetMultiplier(spot) {
+  if (spot.startsWith('num-')) return 36;
+  if (spot.startsWith('col-') || spot.startsWith('dozen-')) return 3;
+  return 2;
+}
+
+const HILO_RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const HILO_SUITS = ['♠', '♥', '♦', '♣'];
+const HILO_HOUSE_EDGE = 0.99;
+
+function hiloRandomCard() {
+  const rank = HILO_RANKS[Math.floor(random() * HILO_RANKS.length)];
+  const suit = HILO_SUITS[Math.floor(random() * HILO_SUITS.length)];
+  return { rank, suit, red: suit === '♥' || suit === '♦' };
+}
+
+function hiloRankValue(card) {
+  return HILO_RANKS.indexOf(card.rank) + 1;
+}
+
+function hiloStepMult(card, direction) {
+  const rank = hiloRankValue(card);
+  const prob = direction === 'hi' ? (HILO_RANKS.length - rank) / HILO_RANKS.length
+    : (rank - 1) / HILO_RANKS.length;
+  if (prob <= 0) return 0;
+  return HILO_HOUSE_EDGE / prob;
+}
+
+const TOWER_FLOORS = 9;
+const TOWER_HOUSE_EDGE = 0.99;
+const TOWER_DIFFICULTIES = {
+  easy: { cols: 4, traps: 1 },
+  medium: { cols: 3, traps: 1 },
+  hard: { cols: 2, traps: 1 },
+  expert: { cols: 3, traps: 2 },
+};
+
+function towerTrapMap(difficulty) {
+  const config = TOWER_DIFFICULTIES[difficulty] || TOWER_DIFFICULTIES.medium;
+  return Array.from({ length: TOWER_FLOORS }, () => {
+    const indices = shuffle(Array.from({ length: config.cols }, (_, i) => i));
+    return indices.slice(0, config.traps);
+  });
+}
+
+function towerStepMult(config) {
+  const safe = config.cols - config.traps;
+  if (safe <= 0) return 1;
+  return config.cols / safe;
+}
+
+function towerMultiplier(floorsCleared, difficulty) {
+  if (floorsCleared <= 0) return 1;
+  const config = TOWER_DIFFICULTIES[difficulty] || TOWER_DIFFICULTIES.medium;
+  const step = towerStepMult(config);
+  let mult = 1;
+  for (let i = 0; i < floorsCleared; i++) mult *= step;
+  return mult * TOWER_HOUSE_EDGE;
+}
+
+export const SESSION_MAX_PAYOUT = {
+  blackjack: 200,
+  'dd-blackjack': 80,
+  war: 25,
+  default: 120,
+};
+
+export function getSessionMaxCredit(session) {
+  const base = parseFloat(session.totalDebited) || parseFloat(session.bet) || 0;
+  const mult = SESSION_MAX_PAYOUT[session.game] || SESSION_MAX_PAYOUT.default;
+  return base * mult;
+}
+
+export function getClientSessionState(state) {
+  if (!state) return null;
+  if (state.game === 'crash') return { crashPoint: state.crashPoint };
+  if (state.game === 'hilo') return { current: state.current };
+  return null;
 }
 
 export function startGameSession(game, bet, params = {}) {
@@ -250,6 +383,48 @@ export function startGameSession(game, bet, params = {}) {
         bet: amt,
         crashPoint: Math.min(crashPoint, 1000),
         cashedOut: false,
+        createdAt: now,
+      },
+    };
+  }
+
+  if (game === 'hilo') {
+    return {
+      sessionId,
+      state: {
+        game,
+        bet: amt,
+        current: hiloRandomCard(),
+        multiplier: 1,
+        streak: 0,
+        createdAt: now,
+      },
+    };
+  }
+
+  if (game === 'tower') {
+    const difficulty = ['easy', 'medium', 'hard', 'expert'].includes(params.difficulty)
+      ? params.difficulty
+      : 'medium';
+    return {
+      sessionId,
+      state: {
+        game,
+        bet: amt,
+        difficulty,
+        floor: 0,
+        trapMap: towerTrapMap(difficulty),
+        createdAt: now,
+      },
+    };
+  }
+
+  if (game === 'war' || game === 'blackjack' || game === 'dd-blackjack') {
+    return {
+      sessionId,
+      state: {
+        game,
+        bet: amt,
         createdAt: now,
       },
     };
@@ -315,6 +490,82 @@ export function actGameSession(session, action, params = {}) {
       };
     }
     return { error: 'Invalid crash action' };
+  }
+
+  if (session.game === 'hilo') {
+    if (action === 'guess') {
+      const direction = params.direction === 'lo' ? 'lo' : 'hi';
+      const stepMult = hiloStepMult(session.current, direction);
+      if (stepMult <= 0) return { error: 'Invalid guess' };
+      const next = hiloRandomCard();
+      const currentVal = hiloRankValue(session.current);
+      const nextVal = hiloRankValue(next);
+      const won = direction === 'hi' ? nextVal > currentVal : nextVal < currentVal;
+      if (!won) {
+        return {
+          done: true,
+          payout: 0,
+          data: { won: false, next, current: session.current, multiplier: session.multiplier },
+        };
+      }
+      session.multiplier *= stepMult;
+      session.streak += 1;
+      session.current = next;
+      return {
+        done: false,
+        payout: 0,
+        data: { won: true, next, current: session.current, multiplier: session.multiplier, streak: session.streak },
+      };
+    }
+    if (action === 'cashout') {
+      const payout = session.bet * session.multiplier;
+      return {
+        done: true,
+        payout,
+        data: { won: true, multiplier: session.multiplier, streak: session.streak, current: session.current },
+      };
+    }
+    return { error: 'Invalid hilo action' };
+  }
+
+  if (session.game === 'tower') {
+    const config = TOWER_DIFFICULTIES[session.difficulty] || TOWER_DIFFICULTIES.medium;
+    if (action === 'pick') {
+      const col = parseInt(params.col, 10);
+      if (!Number.isInteger(col) || col < 0 || col >= config.cols) return { error: 'Invalid tile' };
+      if (session.floor >= TOWER_FLOORS) return { error: 'Already at summit' };
+      const traps = session.trapMap[session.floor] || [];
+      if (traps.includes(col)) {
+        return {
+          done: true,
+          payout: 0,
+          data: { hitTrap: true, floor: session.floor, col, trapCols: traps },
+        };
+      }
+      session.floor += 1;
+      const atSummit = session.floor >= TOWER_FLOORS;
+      return {
+        done: atSummit,
+        payout: atSummit ? session.bet * towerMultiplier(session.floor, session.difficulty) : 0,
+        data: {
+          hitTrap: false,
+          floor: session.floor,
+          col,
+          multiplier: towerMultiplier(session.floor, session.difficulty),
+          atSummit,
+        },
+      };
+    }
+    if (action === 'cashout') {
+      if (session.floor <= 0) return { error: 'Climb at least one floor' };
+      const mult = towerMultiplier(session.floor, session.difficulty);
+      return {
+        done: true,
+        payout: session.bet * mult,
+        data: { hitTrap: false, floor: session.floor, multiplier: mult },
+      };
+    }
+    return { error: 'Invalid tower action' };
   }
 
   return { error: 'Unsupported session game' };

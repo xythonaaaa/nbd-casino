@@ -13,6 +13,7 @@ const state = {
   multiplier: 1,
   streak: 0,
   history: [],
+  sessionId: null,
 };
 
 const els = {};
@@ -279,19 +280,22 @@ async function startRound() {
   }
 
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
-  const debitResult = window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
-    type: 'bet',
-    label: 'Hi-Lo',
-    detail: `$${bet.toFixed(2)}`,
+
+  const started = await window.XythonWallet?.startSession?.({
     game: 'hilo',
+    bet,
+    currency,
+    params: {},
+    tx: { label: 'Hi-Lo', detail: `$${bet.toFixed(2)}`, game: 'hilo' },
   });
-  if (debitResult?.ok === false) {
-    setMessage(debitResult.error, 'lose');
+  if (!started?.ok) {
+    setMessage(started?.error || 'Could not start round', 'lose');
     return;
   }
 
+  state.sessionId = started.sessionId;
   state.bet = bet;
-  state.current = randomCard();
+  state.current = started.clientState?.current || randomCard();
   state.multiplier = 1;
   state.streak = 0;
   state.phase = 'playing';
@@ -312,24 +316,33 @@ async function guess(direction) {
   state.phase = 'revealing';
   updateUI();
 
-  const next = randomCard();
+  const result = await window.XythonWallet?.actSession?.({
+    sessionId: state.sessionId,
+    act: 'guess',
+    params: { direction },
+  });
+  if (!result?.ok) {
+    setMessage(result?.error || 'Could not guess', 'lose');
+    state.phase = 'playing';
+    updateUI();
+    return;
+  }
+
+  const next = result.outcome.next;
+  const won = result.outcome.won;
   renderPlayingCard(els.nextCard, next, { compact: true });
   els.nextPreview.hidden = false;
   els.card.classList.add('is-reveal');
 
   await delay(REVEAL_MS);
 
-  const currentVal = rankValue(state.current);
-  const nextVal = rankValue(next);
-  const won = direction === 'hi' ? nextVal > currentVal : nextVal < currentVal;
-
   els.card.classList.remove('is-reveal');
   els.nextPreview.hidden = true;
 
   if (won) {
-    state.multiplier *= stepMult;
-    state.streak += 1;
-    state.current = next;
+    state.multiplier = result.outcome.multiplier;
+    state.streak = result.outcome.streak ?? state.streak + 1;
+    state.current = result.outcome.current;
     state.phase = 'playing';
     els.status.textContent = `${cardLabel(next)} — correct! Streak ${state.streak}`;
     setMessage(`+${formatMult(stepMult)} this step`, 'win');
@@ -337,6 +350,7 @@ async function guess(direction) {
     return;
   }
 
+  state.sessionId = null;
   state.phase = 'idle';
   els.stage.classList.add('is-lose');
   els.status.textContent = `${cardLabel(next)} — wrong guess`;
@@ -357,18 +371,21 @@ async function guess(direction) {
 }
 
 async function cashOut() {
-  if (state.phase !== 'playing') return;
+  if (state.phase !== 'playing' || !state.sessionId) return;
 
-  const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
-  const payout = state.bet * state.multiplier;
-  const profit = payout - state.bet;
-
-  window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) + payout, {
-    type: 'win',
-    label: 'Hi-Lo',
-    detail: `Cashed ${formatMult(state.multiplier)} — $${payout.toFixed(2)}`,
-    game: 'hilo',
+  const result = await window.XythonWallet?.actSession?.({
+    sessionId: state.sessionId,
+    act: 'cashout',
+    tx: { label: 'Hi-Lo', game: 'hilo' },
   });
+  if (!result?.ok) {
+    setMessage(result?.error || 'Could not cash out', 'lose');
+    return;
+  }
+
+  const payout = result.payout;
+  const profit = payout - state.bet;
+  state.sessionId = null;
 
   window.XythonStats?.recordRound?.(state.bet, profit > 0, { game: 'hilo', payout });
 

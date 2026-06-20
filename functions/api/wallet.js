@@ -2,6 +2,8 @@ import { isAdmin } from '../lib/admin.js';
 import {
   actGameSession,
   ensureSessionStore,
+  getClientSessionState,
+  getSessionMaxCredit,
   resolveGameRound,
   startGameSession,
 } from '../lib/game-play.js';
@@ -13,6 +15,11 @@ const VALID_CURRENCIES = ['USD', 'BTC', 'ETH', 'LTC'];
 const MIN_TIP_USD = 0.01;
 const TIP_COOLDOWN_MS = 2000;
 const SIGNUP_BONUS_USD = 500;
+const DAILY_REWARD_USD = 500;
+const DAILY_REWARD_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const RAKEBACK_ACCRUAL_RATE = 0.005;
+const MAX_RANK_REWARD_CLAIM = 5000;
+const MAX_RANK_REWARDS_LIFETIME = 20000;
 const SELF_EXCLUDE_DURATIONS = {
   '24h': 24 * 60 * 60 * 1000,
   '7d': 7 * 24 * 60 * 60 * 1000,
@@ -336,11 +343,84 @@ function setPlayerProfile(store, admin, username, options = {}) {
 }
 
 function walletResponseForUser(store, player) {
+  const meta = ensureUserMeta(store, player);
   return {
     grants: getGrantsForUser(store, player),
     balances: getBalancesForUser(store, player),
     combined: getCombinedForUser(store, player),
+    rakebackPending: Math.max(0, parseFloat(meta.rakebackPending) || 0),
+    lastDailyClaimAt: Math.max(0, parseInt(meta.lastDailyClaimAt, 10) || 0),
   };
+}
+
+function accrueServerRakeback(store, player, betAmount) {
+  const amt = parseFloat(betAmount) || 0;
+  if (amt <= 0) return;
+  const meta = ensureUserMeta(store, player);
+  meta.rakebackPending = (parseFloat(meta.rakebackPending) || 0) + amt * RAKEBACK_ACCRUAL_RATE;
+}
+
+function claimPlayerReward(store, username, kind, amount) {
+  const player = resolveWalletUser(store, username);
+  if (!player) return { error: 'Not registered' };
+  if (isSelfExcluded(store, player)) return { error: 'You are self-excluded' };
+
+  const meta = ensureUserMeta(store, player);
+  const cur = 'USD';
+
+  if (kind === 'daily') {
+    const last = Math.max(0, parseInt(meta.lastDailyClaimAt, 10) || 0);
+    if (Date.now() - last < DAILY_REWARD_COOLDOWN_MS) {
+      return { error: 'Daily reward not available yet' };
+    }
+    meta.lastDailyClaimAt = Date.now();
+    creditCombined(store, player, cur, DAILY_REWARD_USD);
+    return {
+      ok: true,
+      kind,
+      amount: DAILY_REWARD_USD,
+      currency: cur,
+      ...walletResponseForUser(store, player),
+    };
+  }
+
+  if (kind === 'rakeback') {
+    const pending = Math.max(0, parseFloat(meta.rakebackPending) || 0);
+    const requested = parseFloat(amount) || 0;
+    const claim = Math.min(pending, requested);
+    if (claim < 0.01) return { error: 'Nothing to claim' };
+    meta.rakebackPending = pending - claim;
+    creditCombined(store, player, cur, claim);
+    return {
+      ok: true,
+      kind,
+      amount: claim,
+      currency: cur,
+      ...walletResponseForUser(store, player),
+    };
+  }
+
+  if (kind === 'rank') {
+    const requested = parseFloat(amount) || 0;
+    if (requested <= 0 || requested > MAX_RANK_REWARD_CLAIM) {
+      return { error: 'Invalid rank reward amount' };
+    }
+    const claimed = parseFloat(meta.rankRewardsClaimed) || 0;
+    if (claimed + requested > MAX_RANK_REWARDS_LIFETIME) {
+      return { error: 'Rank reward limit reached' };
+    }
+    meta.rankRewardsClaimed = claimed + requested;
+    creditCombined(store, player, cur, requested);
+    return {
+      ok: true,
+      kind,
+      amount: requested,
+      currency: cur,
+      ...walletResponseForUser(store, player),
+    };
+  }
+
+  return { error: 'Unknown reward type' };
 }
 
 function playWalletRound(store, username, game, bet, currency, params) {
@@ -361,6 +441,7 @@ function playWalletRound(store, username, game, bet, currency, params) {
   if (outcome.error) return outcome;
 
   if (!debitCombined(store, player, cur, amt)) return { error: 'Insufficient balance' };
+  accrueServerRakeback(store, player, amt);
   if (outcome.payout > 0) creditCombined(store, player, cur, outcome.payout);
 
   return {
@@ -391,17 +472,113 @@ function startWalletSession(store, username, game, bet, currency, params) {
   if (started.error) return started;
 
   if (!debitCombined(store, player, cur, amt)) return { error: 'Insufficient balance' };
+  accrueServerRakeback(store, player, amt);
 
   const meta = ensureUserMeta(store, player);
   const sessions = ensureSessionStore(meta);
-  sessions[started.sessionId] = { ...started.state, currency: cur, username: player };
+  sessions[started.sessionId] = {
+    ...started.state,
+    currency: cur,
+    username: player,
+    totalDebited: amt,
+    totalCredited: 0,
+  };
 
   return {
     ok: true,
     sessionId: started.sessionId,
     game,
     bet: amt,
-    clientState: game === 'crash' ? { crashPoint: started.state.crashPoint } : null,
+    clientState: getClientSessionState(started.state),
+    ...walletResponseForUser(store, player),
+  };
+}
+
+function getWalletSession(store, username, sessionId) {
+  const player = resolveWalletUser(store, username);
+  if (!player) return { error: 'Not registered' };
+  const meta = ensureUserMeta(store, player);
+  const sessions = ensureSessionStore(meta);
+  const session = sessions[String(sessionId || '')];
+  if (!session) return { error: 'Session not found' };
+  return { player, session, sessions, meta };
+}
+
+function sessionDebitWallet(store, username, sessionId, amount, currency) {
+  const lookup = getWalletSession(store, username, sessionId);
+  if (lookup.error) return lookup;
+
+  const { player, session } = lookup;
+  const cur = String(currency || session.currency || 'USD').toUpperCase();
+  if (!VALID_CURRENCIES.includes(cur)) return { error: 'Invalid currency' };
+
+  const amt = parseFloat(amount);
+  if (!amt || amt <= 0) return { error: 'Invalid amount' };
+
+  const combined = getCombinedForUser(store, player);
+  if (combined[cur] < amt) return { error: 'Insufficient balance' };
+
+  if (!debitCombined(store, player, cur, amt)) return { error: 'Insufficient balance' };
+  accrueServerRakeback(store, player, amt);
+  session.totalDebited = (parseFloat(session.totalDebited) || parseFloat(session.bet) || 0) + amt;
+  session.currency = cur;
+
+  return {
+    ok: true,
+    sessionId,
+    amount: amt,
+    totalDebited: session.totalDebited,
+    ...walletResponseForUser(store, player),
+  };
+}
+
+function sessionCreditWallet(store, username, sessionId, amount, currency) {
+  const lookup = getWalletSession(store, username, sessionId);
+  if (lookup.error) return lookup;
+
+  const { player, session } = lookup;
+  const cur = String(currency || session.currency || 'USD').toUpperCase();
+  if (!VALID_CURRENCIES.includes(cur)) return { error: 'Invalid currency' };
+
+  const amt = parseFloat(amount);
+  if (!amt || amt <= 0) return { error: 'Invalid amount' };
+
+  const credited = parseFloat(session.totalCredited) || 0;
+  const maxCredit = getSessionMaxCredit(session);
+  if (credited + amt > maxCredit) return { error: 'Invalid credit amount' };
+
+  creditCombined(store, player, cur, amt);
+  session.totalCredited = credited + amt;
+
+  return {
+    ok: true,
+    sessionId,
+    amount: amt,
+    totalCredited: session.totalCredited,
+    ...walletResponseForUser(store, player),
+  };
+}
+
+function sessionSettleWallet(store, username, sessionId, payout, currency) {
+  const lookup = getWalletSession(store, username, sessionId);
+  if (lookup.error) return lookup;
+
+  const { player, session, sessions } = lookup;
+  const cur = String(currency || session.currency || 'USD').toUpperCase();
+  if (!VALID_CURRENCIES.includes(cur)) return { error: 'Invalid currency' };
+
+  const amt = Math.max(0, parseFloat(payout) || 0);
+  const credited = parseFloat(session.totalCredited) || 0;
+  const maxCredit = getSessionMaxCredit(session);
+  if (credited + amt > maxCredit) return { error: 'Invalid payout amount' };
+
+  if (amt > 0) creditCombined(store, player, cur, amt);
+  delete sessions[sessionId];
+
+  return {
+    ok: true,
+    sessionId,
+    payout: amt,
     ...walletResponseForUser(store, player),
   };
 }
@@ -583,6 +760,14 @@ export async function onRequest(context) {
       return json(result);
     }
 
+    if (payload.action === 'claim-reward') {
+      const result = await writeStore(kv, data =>
+        claimPlayerReward(data, payload.username, payload.kind, payload.amount)
+      );
+      if (result.error) return json(result, { status: 400 });
+      return json(result);
+    }
+
     if (payload.action === 'play') {
       const result = await writeStore(kv, data =>
         playWalletRound(
@@ -621,6 +806,48 @@ export async function onRequest(context) {
           payload.sessionId,
           payload.act,
           payload.params
+        )
+      );
+      if (result.error) return json(result, { status: 400 });
+      return json(result);
+    }
+
+    if (payload.action === 'session-debit') {
+      const result = await writeStore(kv, data =>
+        sessionDebitWallet(
+          data,
+          payload.username,
+          payload.sessionId,
+          payload.amount,
+          payload.currency
+        )
+      );
+      if (result.error) return json(result, { status: 400 });
+      return json(result);
+    }
+
+    if (payload.action === 'session-credit') {
+      const result = await writeStore(kv, data =>
+        sessionCreditWallet(
+          data,
+          payload.username,
+          payload.sessionId,
+          payload.amount,
+          payload.currency
+        )
+      );
+      if (result.error) return json(result, { status: 400 });
+      return json(result);
+    }
+
+    if (payload.action === 'session-settle') {
+      const result = await writeStore(kv, data =>
+        sessionSettleWallet(
+          data,
+          payload.username,
+          payload.sessionId,
+          payload.payout,
+          payload.currency
         )
       );
       if (result.error) return json(result, { status: 400 });

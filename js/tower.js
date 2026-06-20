@@ -24,6 +24,7 @@ const state = {
   picks: [],
   trapMap: [],
   history: [],
+  sessionId: null,
   auto: {
     running: false,
     unlimited: false,
@@ -659,30 +660,54 @@ function onTowerClick(e) {
 }
 
 async function pickTile(floor, col, { silent = false, fast = false, animated = false } = {}) {
-  if (state.phase !== 'playing' || floor !== state.floor) return null;
+  if (state.phase !== 'playing' || floor !== state.floor || !state.sessionId) return null;
 
-  const traps = state.trapMap[floor];
   const tileEl = els.tower.querySelector(`.tw-row[data-floor="${floor}"] .tw-tile[data-col="${col}"]`);
   tileEl?.classList.add('is-picking');
 
   await delay(fast ? 60 : animated ? PICK_MS : 120);
 
+  const result = await window.XythonWallet?.actSession?.({
+    sessionId: state.sessionId,
+    act: 'pick',
+    params: { col },
+  });
+
+  tileEl?.classList.remove('is-picking');
+  if (!result?.ok) {
+    if (!silent) setMessage(result?.error || 'Could not pick tile', 'lose');
+    return null;
+  }
+
   state.picks[floor] = col;
 
-  if (traps.has(col)) {
-    tileEl?.classList.remove('is-picking');
+  if (result.outcome?.hitTrap) {
+    state.trapMap[floor] = new Set(result.outcome.trapCols || []);
+    state.sessionId = null;
     return loseRound(floor, { silent, fast, animated });
   }
 
-  tileEl?.classList.remove('is-picking');
-  state.floor += 1;
+  state.floor = result.outcome?.floor ?? state.floor + 1;
   updateTowerInPlace(floor, col);
   flashStats();
   updateStats();
 
-  if (state.floor >= FLOORS) {
-    await delay(fast ? 140 : animated ? 420 : 350);
-    return cashOut(true, { silent, animated });
+  if (result.done) {
+    state.sessionId = null;
+    const payout = result.payout;
+    const mult = result.outcome?.multiplier ?? getMultiplier(state.floor);
+    const profit = payout - state.bet;
+    window.XythonStats?.recordRound?.(state.bet, profit > 0, { game: 'tower', payout });
+    els.stage.classList.add(profit > 0 ? 'is-win' : 'is-lose');
+    if (!silent) {
+      setStatus(`Summit reached! ${formatMult(mult)}`);
+      setMessage(profit > 0 ? `Won $${profit.toFixed(2)}` : 'Break even', profit > 0 ? 'win' : '');
+      pushHistory({ won: true, mult });
+      showPopup({ won: true, mult, payout, text: `Summit — ${formatMult(mult)}` });
+    }
+    await resetRound({ smooth: silent && state.auto.running });
+    if (!silent) updateUI();
+    return { won: true, payout, mult };
   }
 
   if (!silent) {
@@ -743,6 +768,7 @@ async function resetRound({ smooth = false } = {}) {
   state.floor = 0;
   state.picks = [];
   state.trapMap = [];
+  state.sessionId = null;
   if (state.panel === 'auto') {
     renderAutoTower();
   } else {
@@ -820,19 +846,25 @@ async function startClimb({ silent = false } = {}) {
   }
 
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
-  const debitResult = window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) - bet, {
-    type: 'bet',
-    label: 'Tower',
-    detail: `$${bet.toFixed(2)} — ${getConfig().label}`,
+  const started = await window.XythonWallet?.startSession?.({
     game: 'tower',
+    bet,
+    currency,
+    params: { difficulty: els.difficulty.value },
+    tx: {
+      label: 'Tower',
+      detail: `$${bet.toFixed(2)} — ${getConfig().label}`,
+      game: 'tower',
+    },
   });
-  if (debitResult?.ok === false) return { error: debitResult.error };
+  if (!started?.ok) return { error: started?.error || 'Could not start round' };
 
+  state.sessionId = started.sessionId;
   state.bet = bet;
   state.difficulty = els.difficulty.value;
   state.floor = 0;
   state.picks = [];
-  state.trapMap = generateTrapMap(state.difficulty);
+  state.trapMap = [];
   state.phase = 'playing';
 
   hidePopup();
@@ -845,19 +877,22 @@ async function startClimb({ silent = false } = {}) {
 }
 
 async function cashOut(auto = false, { silent = false, fast = false, animated = false } = {}) {
-  if (state.phase !== 'playing' || state.floor <= 0) return null;
+  if (state.phase !== 'playing' || state.floor <= 0 || !state.sessionId) return null;
 
-  const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
-  const mult = getMultiplier(state.floor);
-  const payout = state.bet * mult;
-  const profit = payout - state.bet;
-
-  window.XythonWallet?.setBalance(currency, (window.XythonWallet?.getBalance(currency) ?? 0) + payout, {
-    type: 'win',
-    label: 'Tower',
-    detail: `Floor ${state.floor} — ${formatMult(mult)} — $${payout.toFixed(2)}`,
-    game: 'tower',
+  const result = await window.XythonWallet?.actSession?.({
+    sessionId: state.sessionId,
+    act: 'cashout',
+    tx: { label: 'Tower', game: 'tower' },
   });
+  if (!result?.ok) {
+    if (!silent) setMessage(result?.error || 'Could not cash out', 'lose');
+    return null;
+  }
+
+  state.sessionId = null;
+  const mult = result.outcome?.multiplier ?? getMultiplier(state.floor);
+  const payout = result.payout;
+  const profit = payout - state.bet;
 
   window.XythonStats?.recordRound?.(state.bet, profit > 0, { game: 'tower', payout });
 

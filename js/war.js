@@ -19,6 +19,7 @@ const state = {
   phase: 'idle',
   busy: false,
   atWar: false,
+  sessionId: null,
   auto: {
     running: false,
     unlimited: false,
@@ -350,8 +351,28 @@ function validateBet(bet, tieBet) {
   return null;
 }
 
-function deductBet(amount, detail) {
+async function deductBet(amount, detail) {
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
+  if (window.XythonWallet?.usesServerWallet?.()) {
+    if (!state.sessionId) {
+      const started = await window.XythonWallet.startSession({
+        game: 'war',
+        bet: amount,
+        currency,
+        tx: { label: 'Surrender or War', detail, game: 'war' },
+      });
+      if (!started?.ok) return started.error || 'Could not place bet';
+      state.sessionId = started.sessionId;
+      return null;
+    }
+    const result = await window.XythonWallet.sessionDebit({
+      sessionId: state.sessionId,
+      amount,
+      tx: { label: 'Surrender or War', detail, game: 'war' },
+    });
+    return result?.ok ? null : result.error || 'Could not place bet';
+  }
+
   const balance = window.XythonWallet?.getBalance(currency) ?? 0;
   const debitResult = window.XythonWallet?.setBalance(currency, balance - amount, {
     type: 'bet',
@@ -362,8 +383,18 @@ function deductBet(amount, detail) {
   return debitResult?.ok === false ? debitResult.error : null;
 }
 
-function creditWin(amount, detail) {
+async function creditWin(amount, detail) {
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
+  if (window.XythonWallet?.usesServerWallet?.()) {
+    if (!state.sessionId) return;
+    await window.XythonWallet.sessionCredit({
+      sessionId: state.sessionId,
+      amount,
+      tx: { label: 'Surrender or War', detail, game: 'war' },
+    });
+    return;
+  }
+
   const balance = window.XythonWallet?.getBalance(currency) ?? 0;
   window.XythonWallet?.setBalance(currency, balance + amount, {
     type: 'win',
@@ -373,14 +404,23 @@ function creditWin(amount, detail) {
   });
 }
 
+async function closeWarSession() {
+  if (!state.sessionId || !window.XythonWallet?.usesServerWallet?.()) {
+    state.sessionId = null;
+    return;
+  }
+  await window.XythonWallet.sessionSettle({ sessionId: state.sessionId, payout: 0 });
+  state.sessionId = null;
+}
+
 function recordStats(wagered, won, payout = 0) {
   window.XythonStats?.recordRound?.(wagered, won, { game: 'war', payout });
 }
 
-function payTieSideBet() {
+async function payTieSideBet() {
   if (state.tieBet <= 0) return 0;
   const payout = state.tieBet * (TIE_PAYOUT + 1);
-  creditWin(payout, `Tie bet won ${TIE_PAYOUT}:1 — $${payout.toFixed(2)}`);
+  await creditWin(payout, `Tie bet won ${TIE_PAYOUT}:1 — $${payout.toFixed(2)}`);
   return payout - state.tieBet;
 }
 
@@ -410,7 +450,7 @@ async function startRound({ fast = false, autoSurrender = false } = {}) {
   showTable(true);
   updateUI();
 
-  const betError = deductBet(bet + tieBet, `Bet $${bet.toFixed(2)}${tieBet > 0 ? ` + tie $${tieBet.toFixed(2)}` : ''}`);
+  const betError = await deductBet(bet + tieBet, `Bet $${bet.toFixed(2)}${tieBet > 0 ? ` + tie $${tieBet.toFixed(2)}` : ''}`);
   if (betError) {
     state.busy = false;
     state.phase = 'idle';
@@ -433,7 +473,7 @@ async function resolveInitial({ autoSurrender = false, fast = false } = {}) {
   const cmp = compareCards(state.playerCard, state.dealerCard);
 
   if (cmp > 0) {
-    finishRound({
+    await finishRound({
       outcome: 'win',
       profit: state.bet,
       panelMessage: `You win! +$${state.bet.toFixed(2)}`,
@@ -444,7 +484,7 @@ async function resolveInitial({ autoSurrender = false, fast = false } = {}) {
   }
 
   if (cmp < 0) {
-    finishRound({
+    await finishRound({
       outcome: 'lose',
       profit: -(state.bet + state.tieBet),
       panelMessage: `Dealer wins — -$${state.bet.toFixed(2)}`,
@@ -454,7 +494,7 @@ async function resolveInitial({ autoSurrender = false, fast = false } = {}) {
     return true;
   }
 
-  const tieProfit = payTieSideBet();
+  const tieProfit = await payTieSideBet();
   els.dealerSlot.classList.add('is-tie');
   els.playerSlot.classList.add('is-tie');
 
@@ -479,9 +519,9 @@ async function doSurrender({ fast = false, tieProfitAlready = 0 } = {}) {
   updateUI();
 
   const half = state.bet / 2;
-  creditWin(half, `Surrendered — returned $${half.toFixed(2)}`);
+  await creditWin(half, `Surrendered — returned $${half.toFixed(2)}`);
 
-  finishRound({
+  await finishRound({
     outcome: 'lose',
     profit: tieProfitAlready - half,
     panelMessage: `Surrendered — -$${half.toFixed(2)}`,
@@ -506,7 +546,7 @@ async function doWar({ fast = false } = {}) {
   setMessage('');
   updateUI();
 
-  const betError = deductBet(state.bet, `War bet $${state.bet.toFixed(2)}`);
+  const betError = await deductBet(state.bet, `War bet $${state.bet.toFixed(2)}`);
   if (betError) {
     state.busy = false;
     state.atWar = false;
@@ -530,8 +570,8 @@ async function doWar({ fast = false } = {}) {
 
   if (cmp >= 0) {
     const payout = state.bet * 3;
-    creditWin(payout, `Won war — $${payout.toFixed(2)} returned`);
-    finishRound({
+    await creditWin(payout, `Won war — $${payout.toFixed(2)} returned`);
+    await finishRound({
       outcome: 'win',
       profit: state.bet + (state.tieBet > 0 ? state.tieBet * TIE_PAYOUT : 0),
       panelMessage: `War won! +$${state.bet.toFixed(2)}`,
@@ -542,7 +582,7 @@ async function doWar({ fast = false } = {}) {
     return;
   }
 
-  finishRound({
+  await finishRound({
     outcome: 'lose',
     profit: -(state.bet * 2),
     panelMessage: `Lost the war — -$${(state.bet * 2).toFixed(2)}`,
@@ -551,7 +591,7 @@ async function doWar({ fast = false } = {}) {
   });
 }
 
-function finishRound({
+async function finishRound({
   outcome,
   profit,
   panelMessage,
@@ -560,8 +600,9 @@ function finishRound({
   fast = false,
 }) {
   if (!skipCredit && outcome === 'win') {
-    creditWin(state.bet * 2, `Won $${(state.bet * 2).toFixed(2)}`);
+    await creditWin(state.bet * 2, `Won $${(state.bet * 2).toFixed(2)}`);
   }
+  await closeWarSession();
 
   state.phase = 'done';
   state.busy = false;

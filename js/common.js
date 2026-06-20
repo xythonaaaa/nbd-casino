@@ -34,6 +34,8 @@ const WALLET_CURRENCIES = ['USD', 'BTC', 'ETH', 'LTC'];
 let walletGrantsPollTimer = null;
 let cachedAccountStatus = null;
 let walletMutationAllowed = false;
+let serverRakebackPending = 0;
+let serverLastDailyClaimAt = 0;
 
 function usesServerWallet() {
   return !!getWalletApiUrl() && isLoggedIn();
@@ -51,6 +53,12 @@ function applyServerWalletFromResponse(data) {
   saveWalletState();
   const username = getLoggedInUsername();
   if (username) markServerWalletSynced(username, grants, balances);
+  if (data.rakebackPending != null) {
+    serverRakebackPending = Math.max(0, parseFloat(data.rakebackPending) || 0);
+  }
+  if (data.lastDailyClaimAt != null) {
+    serverLastDailyClaimAt = Math.max(0, parseInt(data.lastDailyClaimAt, 10) || 0);
+  }
   walletMutationAllowed = false;
 }
 
@@ -194,6 +202,154 @@ async function serverActSession({ sessionId, act, params, tx }) {
     payout,
     outcome: result.data.outcome,
   };
+}
+
+async function serverSessionDebit({ sessionId, amount, currency, tx }) {
+  const username = getLoggedInUsername();
+  if (!username) return { ok: false, error: 'Log in to continue' };
+  if (!getWalletApiUrl()) return { ok: false, error: 'Server wallet unavailable' };
+
+  const amt = parseFloat(amount);
+  if (!amt || amt <= 0) return { ok: false, error: 'Invalid amount' };
+
+  const result = await postWalletAction({
+    action: 'session-debit',
+    username,
+    sessionId,
+    amount: amt,
+    currency: currency || window.XythonWallet?.getActiveCurrency?.() || 'USD',
+  });
+
+  if (!result?.ok) {
+    return { ok: false, error: result?.data?.error || 'Could not debit session' };
+  }
+
+  applyServerWalletFromResponse(result.data);
+  if (tx) {
+    recordTransaction({
+      type: 'bet',
+      amount: -amt,
+      currency: currency || 'USD',
+      label: tx.label || 'Game',
+      detail: tx.detail || `Bet $${amt.toFixed(2)}`,
+      game: tx.game,
+    });
+  }
+  return { ok: true };
+}
+
+async function serverSessionCredit({ sessionId, amount, currency, tx }) {
+  const username = getLoggedInUsername();
+  if (!username) return { ok: false, error: 'Log in to continue' };
+  if (!getWalletApiUrl()) return { ok: false, error: 'Server wallet unavailable' };
+
+  const amt = parseFloat(amount);
+  if (!amt || amt <= 0) return { ok: false, error: 'Invalid amount' };
+
+  const result = await postWalletAction({
+    action: 'session-credit',
+    username,
+    sessionId,
+    amount: amt,
+    currency: currency || window.XythonWallet?.getActiveCurrency?.() || 'USD',
+  });
+
+  if (!result?.ok) {
+    return { ok: false, error: result?.data?.error || 'Could not credit session' };
+  }
+
+  applyServerWalletFromResponse(result.data);
+  if (tx) {
+    recordTransaction({
+      type: 'win',
+      amount: amt,
+      currency: currency || 'USD',
+      label: tx.label || 'Game',
+      detail: tx.detail || `Won $${amt.toFixed(2)}`,
+      game: tx.game,
+    });
+  }
+  return { ok: true };
+}
+
+async function serverSessionSettle({ sessionId, payout, currency, tx }) {
+  const username = getLoggedInUsername();
+  if (!username) return { ok: false, error: 'Log in to continue' };
+  if (!getWalletApiUrl()) return { ok: false, error: 'Server wallet unavailable' };
+
+  const amt = Math.max(0, parseFloat(payout) || 0);
+  const result = await postWalletAction({
+    action: 'session-settle',
+    username,
+    sessionId,
+    payout: amt,
+    currency: currency || window.XythonWallet?.getActiveCurrency?.() || 'USD',
+  });
+
+  if (!result?.ok) {
+    return { ok: false, error: result?.data?.error || 'Could not settle session' };
+  }
+
+  applyServerWalletFromResponse(result.data);
+  if (amt > 0 && tx) {
+    recordTransaction({
+      type: 'win',
+      amount: amt,
+      currency: currency || 'USD',
+      label: tx.label || 'Game',
+      detail: tx.detail || `Won $${amt.toFixed(2)}`,
+      game: tx.game,
+    });
+  }
+  return { ok: true, payout: amt };
+}
+
+async function serverClaimReward({ kind, amount, tx }) {
+  const username = getLoggedInUsername();
+  if (!username) return { ok: false, error: 'Log in to continue' };
+  if (!getWalletApiUrl()) return { ok: false, error: 'Server wallet unavailable' };
+
+  const result = await postWalletAction({
+    action: 'claim-reward',
+    username,
+    kind,
+    amount: amount != null ? parseFloat(amount) : undefined,
+  });
+
+  if (!result?.ok) {
+    return { ok: false, error: result?.data?.error || 'Could not claim reward' };
+  }
+
+  applyServerWalletFromResponse(result.data);
+  const credited = parseFloat(result.data.amount) || 0;
+  if (credited > 0 && tx) {
+    recordTransaction({
+      type: 'reward',
+      amount: credited,
+      currency: 'USD',
+      label: tx.label || 'Reward',
+      detail: tx.detail || `+$${credited.toFixed(2)}`,
+    });
+  }
+  return { ok: true, amount: credited };
+}
+
+function applyInternalWalletDelta(currency, delta, tx) {
+  if (!delta) return;
+  walletMutationAllowed = true;
+  const cur = currency || window.XythonWallet?.getActiveCurrency?.() || 'USD';
+  setWalletBalance(cur, getWalletBalance(cur) + delta);
+  if (tx) {
+    recordTransaction({
+      type: tx.type || (delta > 0 ? 'reward' : 'bet'),
+      amount: delta,
+      currency: cur,
+      label: tx.label || 'Wallet',
+      detail: tx.detail || '',
+      game: tx.game || null,
+    });
+  }
+  walletMutationAllowed = false;
 }
 
 function getWalletApiUrl() {
@@ -2977,14 +3133,13 @@ function markSignupBonusClaimed(username) {
 
 function grantSignupBonus(username) {
   if (!username || hasClaimedSignupBonus(username)) return false;
-  const currency = 'USD';
-  const balance = window.XythonWallet?.getBalance(currency) ?? 0;
-  window.XythonWallet?.setBalance(currency, balance + SIGNUP_BONUS_AMOUNT, {
+  markSignupBonusClaimed(username);
+  if (usesServerWallet()) return true;
+  applyInternalWalletDelta('USD', SIGNUP_BONUS_AMOUNT, {
     type: 'reward',
     label: 'Signup Bonus',
     detail: `+$${SIGNUP_BONUS_AMOUNT.toFixed(2)} welcome bonus`,
   });
-  markSignupBonusClaimed(username);
   return true;
 }
 const RAKEBACK_KEY = 'xython-rakeback';
@@ -3046,6 +3201,7 @@ function accrueRakeback(wageredAmount) {
 }
 
 function getRakebackPending() {
+  if (usesServerWallet()) return serverRakebackPending;
   syncRakebackBackfill();
   return loadRakeback().pending || 0;
 }
@@ -3129,6 +3285,10 @@ function getDailyRewardLastClaim(username) {
 }
 
 function getDailyRewardCooldownRemaining(username) {
+  if (usesServerWallet()) {
+    if (!serverLastDailyClaimAt) return 0;
+    return Math.max(0, DAILY_REWARD_COOLDOWN_MS - (Date.now() - serverLastDailyClaimAt));
+  }
   const last = getDailyRewardLastClaim(username);
   if (!last) return 0;
   const lastTs = new Date(last).getTime();
@@ -3289,53 +3449,97 @@ function closeUserPopout() {
 }
 
 function wireRewardsPopoutActions() {
-  document.getElementById('rewardsDailyClaim')?.addEventListener('click', () => {
+  document.getElementById('rewardsDailyClaim')?.addEventListener('click', async () => {
     if (!requireAuth('register')) return;
     if (!isDailyRewardAvailable()) return;
     const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
-    const balance = window.XythonWallet?.getBalance(currency) ?? 0;
-    window.XythonWallet?.setBalance(currency, balance + DAILY_REWARD_AMOUNT, {
-      type: 'reward',
-      label: 'Daily Bonus',
-      detail: `+$${DAILY_REWARD_AMOUNT.toFixed(2)} daily reward`,
-    });
-    markDailyRewardClaimed();
+    if (usesServerWallet()) {
+      const claimed = await serverClaimReward({
+        kind: 'daily',
+        tx: {
+          label: 'Daily Bonus',
+          detail: `+$${DAILY_REWARD_AMOUNT.toFixed(2)} daily reward`,
+        },
+      });
+      if (!claimed?.ok) {
+        showToast(claimed?.error || 'Could not claim daily reward', 'error');
+        return;
+      }
+    } else {
+      const balance = window.XythonWallet?.getBalance(currency) ?? 0;
+      window.XythonWallet?.setBalance(currency, balance + DAILY_REWARD_AMOUNT, {
+        type: 'reward',
+        label: 'Daily Bonus',
+        detail: `+$${DAILY_REWARD_AMOUNT.toFixed(2)} daily reward`,
+      });
+      markDailyRewardClaimed();
+    }
     refreshRewardsPopout();
     updateRewardsDot();
   });
 
-  document.getElementById('rewardsRakebackClaim')?.addEventListener('click', () => {
+  document.getElementById('rewardsRakebackClaim')?.addEventListener('click', async () => {
     if (!requireAuth('register')) return;
-    const data = loadRakeback();
-    const pending = data.pending || 0;
+    const pending = getRakebackPending();
     if (pending < RAKEBACK_MIN_CLAIM) return;
     const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
-    const balance = window.XythonWallet?.getBalance(currency) ?? 0;
-    window.XythonWallet?.setBalance(currency, balance + pending, {
-      type: 'reward',
-      label: 'Rakeback',
-      detail: `Claimed $${pending.toFixed(2)} rakeback`,
-    });
-    data.pending = 0;
-    data.lifetimeClaimed = (data.lifetimeClaimed || 0) + pending;
-    saveRakeback(data);
+    if (usesServerWallet()) {
+      const claimed = await serverClaimReward({
+        kind: 'rakeback',
+        amount: pending,
+        tx: {
+          label: 'Rakeback',
+          detail: `Claimed $${pending.toFixed(2)} rakeback`,
+        },
+      });
+      if (!claimed?.ok) {
+        showToast(claimed?.error || 'Could not claim rakeback', 'error');
+        return;
+      }
+    } else {
+      const balance = window.XythonWallet?.getBalance(currency) ?? 0;
+      window.XythonWallet?.setBalance(currency, balance + pending, {
+        type: 'reward',
+        label: 'Rakeback',
+        detail: `Claimed $${pending.toFixed(2)} rakeback`,
+      });
+      const data = loadRakeback();
+      data.pending = 0;
+      data.lifetimeClaimed = (data.lifetimeClaimed || 0) + pending;
+      saveRakeback(data);
+    }
     refreshRewardsPopout();
     updateRewardsDot();
   });
 
-  document.getElementById('rewardsRankClaim')?.addEventListener('click', () => {
+  document.getElementById('rewardsRankClaim')?.addEventListener('click', async () => {
     if (!requireAuth('register')) return;
     const pending = getUnclaimedRankRewards();
     const total = pending.reduce((sum, item) => sum + item.amount, 0);
     if (total <= 0) return;
 
     const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
-    const balance = window.XythonWallet?.getBalance(currency) ?? 0;
-    window.XythonWallet?.setBalance(currency, balance + total, {
-      type: 'reward',
-      label: 'Rank Reward',
-      detail: `Claimed $${total.toFixed(2)} from ${pending.length} rank-up${pending.length === 1 ? '' : 's'}`,
-    });
+    if (usesServerWallet()) {
+      const claimed = await serverClaimReward({
+        kind: 'rank',
+        amount: total,
+        tx: {
+          label: 'Rank Reward',
+          detail: `Claimed $${total.toFixed(2)} from ${pending.length} rank-up${pending.length === 1 ? '' : 's'}`,
+        },
+      });
+      if (!claimed?.ok) {
+        showToast(claimed?.error || 'Could not claim rank rewards', 'error');
+        return;
+      }
+    } else {
+      const balance = window.XythonWallet?.getBalance(currency) ?? 0;
+      window.XythonWallet?.setBalance(currency, balance + total, {
+        type: 'reward',
+        label: 'Rank Reward',
+        detail: `Claimed $${total.toFixed(2)} from ${pending.length} rank-up${pending.length === 1 ? '' : 's'}`,
+      });
+    }
 
     const data = loadRankRewards();
     const claimed = new Set(data.claimedIndices);
@@ -4072,6 +4276,10 @@ function depositToVault(currency, amount) {
   const amt = parseFloat(amount);
   if (!amt || amt <= 0) return { ok: false, error: 'Enter a valid amount' };
 
+  if (usesServerWallet()) {
+    return { ok: false, error: 'Vault is local-only — use your wallet balance on the live site' };
+  }
+
   const wallet = getWalletBalance(currency);
   if (amt > wallet) return { ok: false, error: 'Insufficient wallet balance' };
 
@@ -4123,6 +4331,9 @@ window.XythonWallet = {
   playRound: serverPlayRound,
   startSession: serverStartSession,
   actSession: serverActSession,
+  sessionDebit: serverSessionDebit,
+  sessionCredit: serverSessionCredit,
+  sessionSettle: serverSessionSettle,
   debitBet(currency, bet, tx) {
     const block = getBetBlockReason();
     if (block) {

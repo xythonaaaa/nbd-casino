@@ -108,6 +108,23 @@ function applyServerWalletFromResponse(data) {
   walletMutationAllowed = false;
 }
 
+function walletUsesServerWallet() {
+  const ws = window.XythonWallet?.usesServerWallet;
+  if (typeof ws === 'function') return ws.call(window.XythonWallet);
+  return !!ws;
+}
+
+window.walletUsesServerWallet = walletUsesServerWallet;
+
+async function refreshWalletBeforeBet() {
+  if (!requiresServerWallet() || !getSessionToken()) return;
+  await ensureUserOnWalletServer();
+  const username = getLoggedInUsername();
+  if (!username) return;
+  const hasBalance = WALLET_CURRENCIES.some(cur => (parseFloat(serverWalletBalances[cur]) || 0) > 0);
+  if (!hasBalance) await syncWalletGrantsFromServer();
+}
+
 async function serverPlayRound({ game, bet, currency, params, tx }) {
   const username = getLoggedInUsername();
   if (!username) return { ok: false, error: 'Log in to continue' };
@@ -118,6 +135,8 @@ async function serverPlayRound({ game, bet, currency, params, tx }) {
 
   const amt = parseFloat(bet);
   if (!amt || amt <= 0) return { ok: false, error: 'Invalid bet amount' };
+
+  await refreshWalletBeforeBet();
 
   const cur = currency || window.XythonWallet?.getActiveCurrency?.() || 'USD';
   const result = await postWalletAction({
@@ -176,6 +195,8 @@ async function serverStartSession({ game, bet, currency, params, tx }) {
 
   const amt = parseFloat(bet);
   if (!amt || amt <= 0) return { ok: false, error: 'Invalid bet amount' };
+
+  await refreshWalletBeforeBet();
 
   const cur = currency || window.XythonWallet?.getActiveCurrency?.() || 'USD';
   const result = await postWalletAction({
@@ -2525,9 +2546,7 @@ function installProductionWalletGuard() {
     getBalance(currency) {
       return getWalletBalance(currency || orig.getActiveCurrency());
     },
-    get usesServerWallet() {
-      return requiresServerWallet();
-    },
+    usesServerWallet: () => requiresServerWallet(),
     playRound: serverPlayRound,
     startSession: serverStartSession,
     actSession: serverActSession,

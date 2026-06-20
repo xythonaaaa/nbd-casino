@@ -23,7 +23,7 @@ const state = {
 const els = {};
 
 function bjUsesServer() {
-  return window.XythonWallet?.usesServerWallet?.() ?? false;
+  return window.walletUsesServerWallet?.() ?? false;
 }
 
 async function bjOpenSession(totalWager, detail) {

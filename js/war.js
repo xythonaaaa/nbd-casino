@@ -353,7 +353,7 @@ function validateBet(bet, tieBet) {
 
 async function deductBet(amount, detail) {
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
-  if (window.XythonWallet?.usesServerWallet?.()) {
+  if (window.walletUsesServerWallet?.()) {
     if (!state.sessionId) {
       const started = await window.XythonWallet.startSession({
         game: 'war',
@@ -385,7 +385,7 @@ async function deductBet(amount, detail) {
 
 async function creditWin(amount, detail) {
   const currency = window.XythonWallet?.getActiveCurrency() || 'USD';
-  if (window.XythonWallet?.usesServerWallet?.()) {
+  if (window.walletUsesServerWallet?.()) {
     if (!state.sessionId) return;
     await window.XythonWallet.sessionCredit({
       sessionId: state.sessionId,
@@ -405,7 +405,7 @@ async function creditWin(amount, detail) {
 }
 
 async function closeWarSession() {
-  if (!state.sessionId || !window.XythonWallet?.usesServerWallet?.()) {
+  if (!state.sessionId || !window.walletUsesServerWallet?.()) {
     state.sessionId = null;
     return;
   }

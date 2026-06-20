@@ -505,8 +505,8 @@ async function placeBet() {
   }
 
   const debitResult = await bjOpenSession(bet, `Bet $${bet.toFixed(2)}`);
-  if (debitResult?.ok === false) {
-    setMessage(debitResult.error, 'lose');
+  if (!debitResult?.ok) {
+    setMessage(debitResult?.error || 'Could not place bet', 'lose');
     return;
   }
 
@@ -591,10 +591,10 @@ async function splitHand() {
   updateUI();
 
   const debitResult = await bjDebit(splitBet, `Split — $${splitBet.toFixed(2)}`);
-  if (debitResult?.ok === false) {
+  if (!debitResult?.ok) {
     state.busy = false;
     updateUI();
-    setMessage(debitResult.error, 'lose');
+    setMessage(debitResult?.error || 'Could not place bet', 'lose');
     return;
   }
 
@@ -667,10 +667,10 @@ async function doubleDown() {
   state.busy = true;
   updateUI();
   const debitResult = await bjDebit(add, `Double down — $${add.toFixed(2)}`);
-  if (debitResult?.ok === false) {
+  if (!debitResult?.ok) {
     state.busy = false;
     updateUI();
-    setMessage(debitResult.error, 'lose');
+    setMessage(debitResult?.error || 'Could not place bet', 'lose');
     return;
   }
   hand.bet += add;

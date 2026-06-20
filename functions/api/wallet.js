@@ -108,6 +108,12 @@ function resolveWalletUser(store, username) {
   return store.users.find(u => u.toLowerCase() === key) || null;
 }
 
+function resolveOrEnsureWalletUser(store, username) {
+  const existing = resolveWalletUser(store, username);
+  if (existing) return existing;
+  return ensureUser(store, username);
+}
+
 function getBalancesForUser(store, username) {
   const key = userKey(username);
   const raw = store.balances?.[key] || defaultBalances();
@@ -212,7 +218,7 @@ function isSelfExcluded(store, username) {
 }
 
 function applySelfExclusion(store, username, duration) {
-  const player = resolveWalletUser(store, username);
+  const player = resolveOrEnsureWalletUser(store, username);
   if (!player) return { error: 'Not registered' };
 
   const durationKey = String(duration || '').trim();
@@ -366,7 +372,7 @@ function accrueServerRakeback(store, player, betAmount) {
 }
 
 function claimPlayerReward(store, username, kind, amount) {
-  const player = resolveWalletUser(store, username);
+  const player = resolveOrEnsureWalletUser(store, username);
   if (!player) return { error: 'Not registered' };
   if (isSelfExcluded(store, player)) return { error: 'You are self-excluded' };
 
@@ -429,7 +435,7 @@ function claimPlayerReward(store, username, kind, amount) {
 }
 
 function playWalletRound(store, username, game, bet, currency, params) {
-  const player = resolveWalletUser(store, username);
+  const player = resolveOrEnsureWalletUser(store, username);
   if (!player) return { error: 'Not registered' };
   if (isSelfExcluded(store, player)) return { error: 'You are self-excluded and cannot bet' };
 
@@ -460,7 +466,7 @@ function playWalletRound(store, username, game, bet, currency, params) {
 }
 
 function startWalletSession(store, username, game, bet, currency, params) {
-  const player = resolveWalletUser(store, username);
+  const player = resolveOrEnsureWalletUser(store, username);
   if (!player) return { error: 'Not registered' };
   if (isSelfExcluded(store, player)) return { error: 'You are self-excluded and cannot bet' };
 
@@ -500,7 +506,7 @@ function startWalletSession(store, username, game, bet, currency, params) {
 }
 
 function getWalletSession(store, username, sessionId) {
-  const player = resolveWalletUser(store, username);
+  const player = resolveOrEnsureWalletUser(store, username);
   if (!player) return { error: 'Not registered' };
   const meta = ensureUserMeta(store, player);
   const sessions = ensureSessionStore(meta);
@@ -589,7 +595,7 @@ function sessionSettleWallet(store, username, sessionId, payout, currency) {
 }
 
 function actWalletSession(store, username, sessionId, action, params) {
-  const player = resolveWalletUser(store, username);
+  const player = resolveOrEnsureWalletUser(store, username);
   if (!player) return { error: 'Not registered' };
   if (isSelfExcluded(store, player)) return { error: 'You are self-excluded and cannot bet' };
 
@@ -712,6 +718,16 @@ export async function onRequest(context) {
     const auth = await authenticatePayload(kv, payload);
     if (auth.error) return json(auth, { status: 401 });
     const sessionUser = auth.username;
+
+    if (payload.action === 'ensure-user') {
+      const result = await writeStore(kv, data => {
+        const player = ensureUser(data, sessionUser);
+        if (!player) return { error: 'Invalid username' };
+        return { ok: true, username: player, ...walletResponseForUser(data, player) };
+      });
+      if (result.error) return json(result, { status: 400 });
+      return json(result);
+    }
 
     if (payload.action === 'reset-all') {
       const result = await writeStore(kv, data => {

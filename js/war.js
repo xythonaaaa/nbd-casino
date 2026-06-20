@@ -380,7 +380,7 @@ async function deductBet(amount, detail) {
     detail,
     game: 'war',
   });
-  return debitResult?.ok === false ? debitResult.error : null;
+  return !debitResult?.ok ? (debitResult?.error || 'Could not place bet') : null;
 }
 
 async function creditWin(amount, detail) {

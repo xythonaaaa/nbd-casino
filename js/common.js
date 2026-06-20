@@ -410,9 +410,10 @@ function getWalletApiUrl() {
 
 async function postWalletAction(payload) {
   const url = getWalletApiUrl();
-  if (!url) return null;
+  if (!url) return { ok: false, data: { error: 'Server wallet unavailable' } };
   const token = getSessionToken();
-  if (token) payload.sessionToken = token;
+  if (!token) return { ok: false, status: 401, data: { error: 'Not authenticated. Log in again.' } };
+  payload.sessionToken = token;
   try {
     const res = await trustedFetch(url, {
       method: 'POST',
@@ -422,7 +423,7 @@ async function postWalletAction(payload) {
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok, status: res.status, data };
   } catch {
-    return null;
+    return { ok: false, data: { error: 'Network error — try again' } };
   }
 }
 
@@ -499,8 +500,17 @@ function formatAdminDate(ts) {
 }
 
 async function registerUserOnWalletServer(username) {
-  const result = await postWalletAction({ action: 'register', username });
-  return !!result?.ok;
+  return ensureUserOnWalletServer();
+}
+
+async function ensureUserOnWalletServer() {
+  if (!getSessionToken()) return false;
+  const result = await postWalletAction({ action: 'ensure-user' });
+  if (result?.ok && result.data) {
+    applyServerWalletFromResponse(result.data);
+    return true;
+  }
+  return false;
 }
 
 function loadGrantsSynced() {
@@ -525,14 +535,28 @@ async function fetchServerGrants(username) {
     const qs = new URLSearchParams({ user: username });
     if (token) qs.set('sessionToken', token);
     const res = await trustedFetch(`${url}?${qs.toString()}`, { cache: 'no-store' });
-    if (!res.ok) return null;
+    if (res.status === 401) return null;
+    if (!res.ok) {
+      await ensureUserOnWalletServer();
+      const retry = await trustedFetch(`${url}?${qs.toString()}`, { cache: 'no-store' });
+      if (!retry.ok) return null;
+      const retryData = await retry.json();
+      if (retryData.resetAt) await applyServerWalletReset(retryData.resetAt);
+      if (retryData.account) applyAccountStatus(retryData.account);
+      if (retryData.profile) applyServerProfile(retryData.profile, username);
+      return {
+        grants: retryData.grants && typeof retryData.grants === 'object' ? retryData.grants : {},
+        balances: retryData.balances && typeof retryData.balances === 'object' ? retryData.balances : {},
+        account: retryData.account || null,
+        profile: retryData.profile || null,
+      };
+    }
     const data = await res.json();
     if (data.resetAt) await applyServerWalletReset(data.resetAt);
-    if (!data.grants || typeof data.grants !== 'object') return null;
     if (data.account) applyAccountStatus(data.account);
     if (data.profile) applyServerProfile(data.profile, username);
     return {
-      grants: data.grants,
+      grants: data.grants && typeof data.grants === 'object' ? data.grants : {},
       balances: data.balances && typeof data.balances === 'object' ? data.balances : {},
       account: data.account || null,
       profile: data.profile || null,
@@ -827,6 +851,7 @@ async function syncWalletGrantsFromServer() {
   walletMutationAllowed = true;
   WALLET_CURRENCIES.forEach(currency => {
     const serverTotal = getCombinedServerTotal(serverGrants, serverBalances, currency);
+    serverWalletBalances[currency] = serverTotal;
     setWalletBalance(currency, serverTotal, false);
   });
   saveWalletState();
@@ -2448,6 +2473,7 @@ function persistAuthResponse(data) {
   notifyAuthChange();
   renderAuthUI();
   updateMaintenanceOverlay();
+  void ensureUserOnWalletServer().then(() => syncWalletGrantsFromServer());
   return true;
 }
 
@@ -2712,10 +2738,9 @@ function startAffiliatePolling() {
 
 async function syncCurrentUserToServer() {
   const username = getLoggedInUsername();
-  if (username) {
-    await registerUserOnServer(username);
-    registerUserOnWalletServer(username);
-  }
+  if (!username || !getSessionToken()) return;
+  await registerUserOnServer(username);
+  await ensureUserOnWalletServer();
 }
 
 function loadRegisteredUsers() {

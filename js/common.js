@@ -2180,6 +2180,7 @@ function getLeaderboardBetCount(game) {
 }
 
 window.NbdLeaderboard = {
+  maxBet: LEADERBOARD_MAX_BET,
   getBigWins: game => getLeaderboardWins(game, 'big'),
   getLuckyWins: game => getLeaderboardWins(game, 'lucky'),
   getBetCount: getLeaderboardBetCount,

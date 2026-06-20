@@ -3,13 +3,19 @@ const ORIGINALS_GAMES = new Set([
   'keno', 'limbo', 'war', 'coinflip', 'hilo', 'tower', 'wheel',
 ]);
 
-const LEADERBOARD_MAX_BET = 5000;
+const LEADERBOARD_MAX_BET = window.NbdLeaderboard?.maxBet ?? 5000;
 const BANNED_LEADERBOARD_USERS = new Set(['tiddlesz']);
 
 let activeFilter = 'originals';
 
 document.addEventListener('DOMContentLoaded', () => {
   initCommon();
+
+  const maxBet = window.NbdLeaderboard?.maxBet ?? 5000;
+  const noteEl = document.getElementById('leaderboardNote');
+  if (noteEl) {
+    noteEl.textContent = `Only bets up to $${maxBet.toLocaleString()} per round appear on the leaderboard and live feed.`;
+  }
 
   document.querySelectorAll('.leaderboard-filter').forEach(btn => {
     btn.addEventListener('click', () => {

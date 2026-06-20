@@ -30,8 +30,8 @@ function requiresServerWallet() {
 
 const usesServerWallet = () => requiresServerWallet();
 
-// Set to false when maintenance is over.
-const SITE_MAINTENANCE_MODE = true;
+// Set to true to show maintenance overlay for non-admins.
+const SITE_MAINTENANCE_MODE = false;
 
 const PANEL_STORAGE_KEY = 'xython-panel-open';
 const WALLET_STORAGE_KEY = 'xython-wallet';

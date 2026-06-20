@@ -162,6 +162,7 @@ async function serverPlayRound({ game, bet, currency, params, tx }) {
     outcome: result.data.outcome,
     payout: result.data.payout,
     bet: amt,
+    game,
   };
 }
 
@@ -2115,7 +2116,6 @@ async function recordLeaderboardRound({ game, bet, payout, mult, won }) {
 
   const payload = {
     game,
-    user,
     hidden,
     bet: betAmt,
     payout: payAmt,
@@ -2123,23 +2123,15 @@ async function recordLeaderboardRound({ game, bet, payout, mult, won }) {
     won: won === true,
   };
 
-  const url = getLeaderboardApiUrl();
-  if (url) {
-    try {
-      const res = await trustedFetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        leaderboardUsingServer = true;
-        leaderboardCache = normalizeLeaderboardData(data);
-        document.dispatchEvent(new CustomEvent('xython:leaderboard-change', { detail: leaderboardCache }));
-        return;
-      }
-    } catch { /* fallback to local */ }
+  const result = await postLeaderboardAction(payload);
+  if (result?.ok && result.data) {
+    leaderboardUsingServer = true;
+    leaderboardCache = normalizeLeaderboardData(result.data);
+    document.dispatchEvent(new CustomEvent('xython:leaderboard-change', { detail: leaderboardCache }));
+    return;
   }
+
+  if (requiresServerWallet()) return;
 
   const data = loadLeaderboardLocal();
   data.bets[game] = (data.bets[game] || 0) + 1;

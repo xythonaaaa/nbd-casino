@@ -167,7 +167,9 @@ export async function onRequest(context) {
 
     const betAmt = Math.max(0, parseFloat(payload.bet) || 0);
     const payAmt = Math.max(0, parseFloat(payload.payout) || 0);
-    const user = String(sessionUser || 'Player').trim().slice(0, 16) || 'Player';
+    const user = payload.hidden
+      ? 'Hidden'
+      : (String(sessionUser || 'Player').trim().slice(0, 16) || 'Player');
     if (betAmt > LEADERBOARD_MAX_BET || BANNED_LEADERBOARD_USERS.has(userKey(user))) {
       const data = await loadData(kv);
       return json({ ok: true, ignored: 'blocked', ...data });

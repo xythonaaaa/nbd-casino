@@ -1,4 +1,5 @@
 import { isAdmin } from '../lib/admin.js';
+import { authenticatePayload } from '../lib/auth.js';
 import { json, methodNotAllowed, corsOptions, parseJson } from '../lib/http.js';
 import { kvGet, kvSet } from '../lib/kv.js';
 
@@ -122,8 +123,12 @@ export async function onRequest(context) {
     const payload = await parseJson(request);
     if (!payload) return json({ error: 'Bad request' }, 400);
 
+    const auth = await authenticatePayload(env.WALLET_KV, payload);
+    if (auth.error) return json(auth, { status: 401 });
+    const sessionUser = auth.username;
+
     if (payload.action === 'reset-originals') {
-      if (!isAdmin(payload.admin)) {
+      if (!isAdmin(sessionUser)) {
         return json({ error: 'Admin only' }, 403);
       }
       const data = await loadData(kv);
@@ -133,7 +138,7 @@ export async function onRequest(context) {
     }
 
     if (payload.action === 'reset-all') {
-      if (!isAdmin(payload.admin)) {
+      if (!isAdmin(sessionUser)) {
         return json({ error: 'Admin only' }, 403);
       }
       const data = resetAllLeaderboard(await loadData(kv));
@@ -142,7 +147,7 @@ export async function onRequest(context) {
     }
 
     if (payload.action === 'remove-player') {
-      if (!isAdmin(payload.admin)) {
+      if (!isAdmin(sessionUser)) {
         return json({ error: 'Admin only' }, 403);
       }
       const { keys, names } = parseUserTargets(payload);
@@ -162,7 +167,7 @@ export async function onRequest(context) {
 
     const betAmt = Math.max(0, parseFloat(payload.bet) || 0);
     const payAmt = Math.max(0, parseFloat(payload.payout) || 0);
-    const user = String(payload.user || 'Player').trim().slice(0, 16) || 'Player';
+    const user = String(sessionUser || 'Player').trim().slice(0, 16) || 'Player';
     if (betAmt > LEADERBOARD_MAX_BET || BANNED_LEADERBOARD_USERS.has(userKey(user))) {
       const data = await loadData(kv);
       return json({ ok: true, ignored: 'blocked', ...data });

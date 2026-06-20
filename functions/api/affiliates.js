@@ -1,3 +1,4 @@
+import { authenticatePayload } from '../lib/auth.js';
 import { json, methodNotAllowed, corsOptions, parseJson } from '../lib/http.js';
 import { kvGet, kvSet } from '../lib/kv.js';
 
@@ -206,16 +207,19 @@ export async function onRequest(context) {
     if (!payload) return json({ error: 'Bad request' }, 400);
 
     const action = payload.action;
+    const auth = await authenticatePayload(env.WALLET_KV, payload);
+    if (auth.error) return json(auth, { status: 401 });
+    const sessionUser = auth.username;
 
     if (action === 'register') {
-      const result = await writeStore(kv, data => registerUser(data, payload.username));
+      const result = await writeStore(kv, data => registerUser(data, sessionUser));
       if (result.error) return json(result, { status: 400 });
       return json({ ok: true });
     }
 
     if (action === 'link') {
       const result = await writeStore(kv, data =>
-        linkReferral(data, payload.newUser, payload.referrer)
+        linkReferral(data, sessionUser, payload.referrer)
       );
       if (result.error) return json(result, { status: 400 });
       return json(result);
@@ -223,14 +227,14 @@ export async function onRequest(context) {
 
     if (action === 'wager') {
       await writeStore(kv, data => {
-        accrueWager(data, payload.username, payload.amount);
+        accrueWager(data, sessionUser, payload.amount);
         return { ok: true };
       });
       return json({ ok: true });
     }
 
     if (action === 'claim') {
-      const result = await writeStore(kv, data => claimCommission(data, payload.username));
+      const result = await writeStore(kv, data => claimCommission(data, sessionUser));
       return json(result);
     }
 

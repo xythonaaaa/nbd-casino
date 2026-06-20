@@ -363,6 +363,8 @@ function getWalletApiUrl() {
 async function postWalletAction(payload) {
   const url = getWalletApiUrl();
   if (!url) return null;
+  const token = getSessionToken();
+  if (token) payload.sessionToken = token;
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -379,6 +381,8 @@ async function postWalletAction(payload) {
 async function postLeaderboardAction(payload) {
   const url = getLeaderboardApiUrl();
   if (!url) return null;
+  const token = getSessionToken();
+  if (token) payload.sessionToken = token;
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -405,8 +409,9 @@ async function fetchAdminPlayers() {
   if (!url) return { ok: false, data: { error: 'Player list API is unavailable on this page.' } };
   if (!isAdmin()) return { ok: false, data: { error: 'Admin access required.' } };
   try {
-    const admin = encodeURIComponent(getLoggedInUsername());
-    const res = await fetch(`${url}?admin=${admin}`, { cache: 'no-store' });
+    const token = getSessionToken();
+    if (!token) return { ok: false, data: { error: 'Log in to continue' } };
+    const res = await fetch(`${url}?sessionToken=${encodeURIComponent(token)}`, { cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return { ok: false, data };
     return { ok: true, data };
@@ -418,6 +423,8 @@ async function fetchAdminPlayers() {
 async function postAdminPlayersAction(payload) {
   const url = getAdminPlayersApiUrl();
   if (!url) return null;
+  const token = getSessionToken();
+  if (token) payload.sessionToken = token;
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -466,7 +473,10 @@ async function fetchServerGrants(username) {
   const url = getWalletApiUrl();
   if (!url || !username) return null;
   try {
-    const res = await fetch(`${url}?user=${encodeURIComponent(username)}`, { cache: 'no-store' });
+    const token = getSessionToken();
+    const qs = new URLSearchParams({ user: username });
+    if (token) qs.set('sessionToken', token);
+    const res = await fetch(`${url}?${qs.toString()}`, { cache: 'no-store' });
     if (!res.ok) return null;
     const data = await res.json();
     if (data.resetAt) await applyServerWalletReset(data.resetAt);
@@ -1364,15 +1374,19 @@ async function fetchChatFromServer() {
   }
 }
 
-async function postChatToServer(username, text) {
+async function postChatToServer(text) {
   const url = getChatApiUrl();
   if (!url) return false;
+
+  const payload = { text };
+  const token = getSessionToken();
+  if (token) payload.sessionToken = token;
 
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user: username, text }),
+      body: JSON.stringify(payload),
     });
     return res.ok;
   } catch {
@@ -1388,7 +1402,11 @@ async function deleteChatMessageFromServer(messageId, admin) {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'delete-message', admin, messageId }),
+      body: JSON.stringify({
+        action: 'delete-message',
+        messageId,
+        sessionToken: getSessionToken(),
+      }),
     });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok, data };
@@ -1460,7 +1478,7 @@ async function addChatMessage(username, text) {
   if (looksLikeFakeTipAnnouncement(clean)) return { ok: false, error: 'Message not allowed' };
 
   if (getChatApiUrl()) {
-    const posted = await postChatToServer(user, clean);
+    const posted = await postChatToServer(clean);
     if (posted) {
       await refreshChatMessages();
       return { ok: true };
@@ -1835,6 +1853,7 @@ function initPanelTabs() {
 }
 
 const USER_STORAGE_KEY = 'xython-user';
+const SESSION_STORAGE_KEY = 'xython-session';
 const WELCOME_AUTH_SEEN_KEY = 'xython-welcome-auth-seen';
 const SETTINGS_STORAGE_KEY = 'xython-settings';
 
@@ -2341,6 +2360,90 @@ function saveUser(username) {
   }));
 }
 
+function getAuthApiUrl() {
+  if (window.NBD_AUTH_API) return window.NBD_AUTH_API;
+  if (location.protocol === 'http:' || location.protocol === 'https:') {
+    return `${location.origin}/api/auth`;
+  }
+  return null;
+}
+
+function getSessionToken() {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.token || null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(token, username, expiresAt) {
+  if (!token) return;
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+    token,
+    username: username || getLoggedInUsername(),
+    expiresAt: expiresAt || 0,
+  }));
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
+async function postAuthAction(payload) {
+  const url = getAuthApiUrl();
+  if (!url) return null;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  } catch {
+    return null;
+  }
+}
+
+async function serverRegisterAccount(username, password) {
+  return postAuthAction({ action: 'register', username, password });
+}
+
+async function serverLoginAccount(username, password) {
+  const account = getAccount(username);
+  const payload = { action: 'login', username, password };
+  if (account?.hash && account?.salt) {
+    payload.migration = { hash: account.hash, salt: account.salt };
+  }
+  return postAuthAction(payload);
+}
+
+async function verifyServerSession() {
+  const url = getAuthApiUrl();
+  const token = getSessionToken();
+  if (!url) return true;
+  if (!token) {
+    if (getLoggedInUser()) clearUser();
+    return false;
+  }
+  try {
+    const res = await fetch(`${url}?token=${encodeURIComponent(token)}`, { cache: 'no-store' });
+    if (!res.ok) {
+      clearSession();
+      clearUser();
+      return false;
+    }
+    const data = await res.json();
+    if (data.username) saveUser(data.username);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const ACCOUNTS_KEY = 'xython-accounts-v1';
 const REGISTERED_USERS_KEY = 'xython-registered-users';
 const REF_SESSION_KEY = 'xython-ref-pending';
@@ -2366,6 +2469,8 @@ function getAffiliateApiUrl() {
 async function postAffiliateAction(payload) {
   const url = getAffiliateApiUrl();
   if (!url) return null;
+  const token = getSessionToken();
+  if (token) payload.sessionToken = token;
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -2559,6 +2664,15 @@ async function verifyAccountPassword(username, password) {
 }
 
 async function createAccount(username, password) {
+  if (getAuthApiUrl()) {
+    const reg = await serverRegisterAccount(username, password);
+    if (!reg?.ok) {
+      throw new Error(reg?.data?.error || 'Could not register on server');
+    }
+    saveSession(reg.data.sessionToken, reg.data.username, reg.data.expiresAt);
+  } else {
+    await registerUserOnWalletServer(username);
+  }
   const creds = await createPasswordCredentials(password);
   const accounts = loadAccounts();
   const key = username.toLowerCase();
@@ -2571,7 +2685,9 @@ async function createAccount(username, password) {
   saveAccounts(accounts);
   markUserRegistered(username);
   await registerUserOnServer(username);
-  registerUserOnWalletServer(username);
+  if (!getAuthApiUrl()) {
+    registerUserOnWalletServer(username);
+  }
 }
 
 function backfillRegisteredUsers() {
@@ -2985,6 +3101,11 @@ window.XythonAffiliates = {
 };
 
 function clearUser() {
+  const token = getSessionToken();
+  if (token && getAuthApiUrl()) {
+    postAuthAction({ action: 'logout', sessionToken: token });
+  }
+  clearSession();
   localStorage.removeItem(USER_STORAGE_KEY);
   notifyAuthChange();
 }
@@ -2996,7 +3117,10 @@ function notifyAuthChange() {
 }
 
 function isLoggedIn() {
-  return !!getLoggedInUser();
+  const user = getLoggedInUser();
+  if (!user) return false;
+  if (getAuthApiUrl() && !getSessionToken()) return false;
+  return true;
 }
 
 function hasSeenWelcomeAuth() {
@@ -3930,6 +4054,20 @@ function initAuthModal() {
       successEl.hidden = true;
       passwordInput.focus();
       return;
+    }
+
+    if (getAuthApiUrl()) {
+      submitBtn.disabled = true;
+      const login = await serverLoginAccount(username, password);
+      submitBtn.disabled = false;
+      if (!login?.ok) {
+        errorEl.textContent = login?.data?.error || 'Could not log in';
+        errorEl.hidden = false;
+        successEl.hidden = true;
+        passwordInput.focus();
+        return;
+      }
+      saveSession(login.data.sessionToken, login.data.username, login.data.expiresAt);
     }
 
     saveUser(username);
@@ -5364,35 +5502,44 @@ function initCommon() {
     location.replace(`https://${location.host}${location.pathname}${location.search}${location.hash}`);
     return;
   }
-  captureReferralFromUrl();
-  backfillRegisteredUsers();
-  initSidebarNav();
-  initSidebar();
-  initRightPanelToggle();
-  initWallet();
-  initAdminPanelModal();
-  initAuth();
-  initUserSettings();
-  initPanelTabs();
-  initChat();
-  startLeaderboardPolling();
-  startAffiliatePolling();
-  ensureWalletResetSynced();
-  startWalletGrantsPolling();
-  syncCurrentUserToServer();
-  if (!initCommon.affiliateAuthBound) {
-    document.addEventListener('xython:auth-change', () => {
-      syncCurrentUserToServer();
-      startAffiliatePolling();
-      startWalletGrantsPolling();
-    });
-    initCommon.affiliateAuthBound = true;
+
+  const finishInit = () => {
+    captureReferralFromUrl();
+    backfillRegisteredUsers();
+    initSidebarNav();
+    initSidebar();
+    initRightPanelToggle();
+    initWallet();
+    initAdminPanelModal();
+    initAuth();
+    initUserSettings();
+    initPanelTabs();
+    initChat();
+    startLeaderboardPolling();
+    startAffiliatePolling();
+    ensureWalletResetSynced();
+    startWalletGrantsPolling();
+    syncCurrentUserToServer();
+    if (!initCommon.affiliateAuthBound) {
+      document.addEventListener('xython:auth-change', () => {
+        syncCurrentUserToServer();
+        startAffiliatePolling();
+        startWalletGrantsPolling();
+      });
+      initCommon.affiliateAuthBound = true;
+    }
+    initLiveBets();
+    initCasinoThemeLoader();
+    initGameInfoLoader();
+    enhanceAccountNav();
+    renderSelfExclusionBanner();
+  };
+
+  if (getAuthApiUrl()) {
+    verifyServerSession().finally(finishInit);
+  } else {
+    finishInit();
   }
-  initLiveBets();
-  initCasinoThemeLoader();
-  initGameInfoLoader();
-  enhanceAccountNav();
-  renderSelfExclusionBanner();
 }
 
 function initGameInfoLoader() {

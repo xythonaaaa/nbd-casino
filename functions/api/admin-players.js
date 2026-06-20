@@ -1,4 +1,5 @@
 import { isAdmin } from '../lib/admin.js';
+import { authenticateRequest } from '../lib/auth.js';
 import { json, methodNotAllowed, corsOptions, parseJson } from '../lib/http.js';
 import { kvGet, kvSet } from '../lib/kv.js';
 
@@ -308,8 +309,10 @@ export async function onRequest(context) {
 
   if (request.method === 'GET') {
     const url = new URL(request.url);
-    const admin = url.searchParams.get('admin') || '';
-    if (!isAdmin(admin)) {
+    const payload = { sessionToken: url.searchParams.get('sessionToken') || '' };
+    const auth = await authenticateRequest(env.WALLET_KV, request, payload);
+    if (auth.error) return json(auth, { status: 401 });
+    if (!isAdmin(auth.username)) {
       return json({ error: 'Admin only' }, 403);
     }
 
@@ -327,7 +330,9 @@ export async function onRequest(context) {
     const payload = await parseJson(request);
     if (!payload) return json({ error: 'Bad request' }, 400);
 
-    if (!isAdmin(payload.admin)) {
+    const auth = await authenticateRequest(env.WALLET_KV, request, payload);
+    if (auth.error) return json(auth, { status: 401 });
+    if (!isAdmin(auth.username)) {
       return json({ error: 'Admin only' }, 403);
     }
 

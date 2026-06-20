@@ -1,4 +1,5 @@
 import { isAdmin } from '../lib/admin.js';
+import { authenticatePayload } from '../lib/auth.js';
 import {
   CHAT_MESSAGES_KEY,
   CHAT_MAX_MESSAGES,
@@ -30,7 +31,9 @@ export async function onRequest(context) {
     if (!payload) return json({ error: 'Bad request' }, 400);
 
     if (payload.action === 'delete-message') {
-      if (!isAdmin(payload.admin)) {
+      const auth = await authenticatePayload(env.WALLET_KV, payload);
+      if (auth.error) return json(auth, { status: 401 });
+      if (!isAdmin(auth.username)) {
         return json({ error: 'Admin only' }, 403);
       }
 
@@ -50,8 +53,11 @@ export async function onRequest(context) {
       return json({ ok: true, messages: filtered });
     }
 
+    const auth = await authenticatePayload(env.WALLET_KV, payload);
+    if (auth.error) return json(auth, { status: 401 });
+
     const text = String(payload.text || '').trim().slice(0, 240);
-    const user = normalizeChatUsername(payload.user);
+    const user = normalizeChatUsername(auth.username);
     if (!text || !user) {
       return json({ error: 'Invalid message' }, 400);
     }

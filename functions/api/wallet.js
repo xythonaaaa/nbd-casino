@@ -1,4 +1,5 @@
 import { isAdmin } from '../lib/admin.js';
+import { authenticatePayload, authUserKey, verifySession } from '../lib/auth.js';
 import {
   appendSystemChatMessage,
   formatTipChatMessage,
@@ -682,8 +683,13 @@ export async function onRequest(context) {
     }
 
     const user = url.searchParams.get('user') || '';
+    const sessionToken = url.searchParams.get('sessionToken') || '';
     if (!user.trim()) {
       return json({ error: 'Missing user' }, 400);
+    }
+    const session = await verifySession(kv, sessionToken);
+    if (!session || authUserKey(session.username) !== authUserKey(user)) {
+      return json({ error: 'Not authenticated' }, 401);
     }
     const profile = getPlayerProfile(data, user);
     return json({
@@ -700,18 +706,16 @@ export async function onRequest(context) {
     if (!payload) return json({ error: 'Bad request' }, 400);
 
     if (payload.action === 'register') {
-      const result = await writeStore(kv, data => {
-        const name = ensureUser(data, payload.username);
-        if (!name) return { error: 'Invalid username' };
-        return { ok: true };
-      });
-      if (result.error) return json(result, { status: 400 });
-      return json({ ok: true });
+      return json({ error: 'Use /api/auth to register' }, 400);
     }
+
+    const auth = await authenticatePayload(kv, payload);
+    if (auth.error) return json(auth, { status: 401 });
+    const sessionUser = auth.username;
 
     if (payload.action === 'reset-all') {
       const result = await writeStore(kv, data => {
-        if (!isAdmin(payload.admin)) return { error: 'Admin only' };
+        if (!isAdmin(sessionUser)) return { error: 'Admin only' };
         return resetAllWallets(data);
       });
       if (result.error) return json(result, { status: result.error === 'Admin only' ? 403 : 400 });
@@ -722,7 +726,7 @@ export async function onRequest(context) {
     if (payload.action === 'reset-player') {
       const target = payload.username || payload.to;
       const result = await writeStore(kv, data =>
-        resetPlayerWallet(data, payload.admin, target)
+        resetPlayerWallet(data, sessionUser, target)
       );
       if (result.error) return json(result, { status: result.error === 'Admin only' ? 403 : 400 });
       return json(result);
@@ -731,7 +735,7 @@ export async function onRequest(context) {
     if (payload.action === 'set-player-profile') {
       const target = payload.username || payload.to;
       const result = await writeStore(kv, data =>
-        setPlayerProfile(data, payload.admin, target, {
+        setPlayerProfile(data, sessionUser, target, {
           wagered: payload.wagered,
           resetRakeback: !!payload.resetRakeback,
         })
@@ -742,7 +746,7 @@ export async function onRequest(context) {
 
     if (payload.action === 'send') {
       const result = await writeStore(kv, data =>
-        sendMoney(data, payload.admin, payload.to, payload.amount, payload.currency)
+        sendMoney(data, sessionUser, payload.to, payload.amount, payload.currency)
       );
       if (result.error) return json(result, { status: result.error === 'Admin only' ? 403 : 400 });
       return json(result);
@@ -750,7 +754,7 @@ export async function onRequest(context) {
 
     if (payload.action === 'tip') {
       const result = await writeStore(kv, data =>
-        tipPlayer(data, payload.from, payload.to, payload.amount, payload.currency)
+        tipPlayer(data, sessionUser, payload.to, payload.amount, payload.currency)
       );
       if (result.error) return json(result, { status: 400 });
       if (result.ok && env.CHAT_KV) {
@@ -764,7 +768,7 @@ export async function onRequest(context) {
 
     if (payload.action === 'self-exclude') {
       const result = await writeStore(kv, data =>
-        applySelfExclusion(data, payload.username, payload.duration)
+        applySelfExclusion(data, sessionUser, payload.duration)
       );
       if (result.error) return json(result, { status: 400 });
       return json(result);
@@ -772,7 +776,7 @@ export async function onRequest(context) {
 
     if (payload.action === 'claim-reward') {
       const result = await writeStore(kv, data =>
-        claimPlayerReward(data, payload.username, payload.kind, payload.amount)
+        claimPlayerReward(data, sessionUser, payload.kind, payload.amount)
       );
       if (result.error) return json(result, { status: 400 });
       return json(result);
@@ -782,7 +786,7 @@ export async function onRequest(context) {
       const result = await writeStore(kv, data =>
         playWalletRound(
           data,
-          payload.username,
+          sessionUser,
           payload.game,
           payload.bet,
           payload.currency,
@@ -797,7 +801,7 @@ export async function onRequest(context) {
       const result = await writeStore(kv, data =>
         startWalletSession(
           data,
-          payload.username,
+          sessionUser,
           payload.game,
           payload.bet,
           payload.currency,
@@ -812,7 +816,7 @@ export async function onRequest(context) {
       const result = await writeStore(kv, data =>
         actWalletSession(
           data,
-          payload.username,
+          sessionUser,
           payload.sessionId,
           payload.act,
           payload.params
@@ -826,7 +830,7 @@ export async function onRequest(context) {
       const result = await writeStore(kv, data =>
         sessionDebitWallet(
           data,
-          payload.username,
+          sessionUser,
           payload.sessionId,
           payload.amount,
           payload.currency
@@ -840,7 +844,7 @@ export async function onRequest(context) {
       const result = await writeStore(kv, data =>
         sessionCreditWallet(
           data,
-          payload.username,
+          sessionUser,
           payload.sessionId,
           payload.amount,
           payload.currency
@@ -854,7 +858,7 @@ export async function onRequest(context) {
       const result = await writeStore(kv, data =>
         sessionSettleWallet(
           data,
-          payload.username,
+          sessionUser,
           payload.sessionId,
           payload.payout,
           payload.currency

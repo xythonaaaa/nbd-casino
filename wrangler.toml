@@ -9,6 +9,7 @@ pages_build_output_dir = "."
 
 # KV bindings for local `wrangler pages dev`.
 # Production/preview deploys also need bindings under Pages → Settings → Functions.
+# Set ADMIN_BOOTSTRAP_SECRET in Pages → Settings → Environment variables to recover admin login.
 
 [[kv_namespaces]]
 binding = "CHAT_KV"

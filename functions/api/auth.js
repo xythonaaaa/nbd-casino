@@ -1,8 +1,11 @@
+import { isAdmin } from '../lib/admin.js';
 import {
   authenticateRequest,
+  bootstrapAdminPassword,
   createAuthSession,
   loginWithPassword,
   registerWithPassword,
+  revokeAllUserSessions,
   revokeAuthSession,
   verifySession,
 } from '../lib/auth.js';
@@ -77,6 +80,7 @@ export async function onRequest(context) {
       ok: true,
       username: session.username,
       expiresAt: session.expiresAt,
+      isAdmin: isAdmin(session.username),
     });
   }
 
@@ -87,6 +91,30 @@ export async function onRequest(context) {
     if (payload.action === 'logout') {
       await revokeAuthSession(kv, payload.sessionToken);
       return json({ ok: true });
+    }
+
+    if (payload.action === 'bootstrap-admin') {
+      const result = await writeStore(kv, async data =>
+        bootstrapAdminPassword(
+          data,
+          payload.username || 'ceo',
+          payload.password,
+          payload.secret,
+          env.ADMIN_BOOTSTRAP_SECRET
+        )
+      );
+      if (result.error) {
+        return json(result, { status: result.error === 'Unauthorized' ? 403 : 400 });
+      }
+      await revokeAllUserSessions(kv, result.username);
+      const session = await createAuthSession(kv, result.username);
+      return json({
+        ok: true,
+        username: result.username,
+        sessionToken: session.token,
+        expiresAt: session.expiresAt,
+        isAdmin: true,
+      });
     }
 
     if (payload.action === 'register') {
@@ -107,12 +135,13 @@ export async function onRequest(context) {
         username: result.username,
         sessionToken: session.token,
         expiresAt: session.expiresAt,
+        isAdmin: isAdmin(result.username),
       });
     }
 
     if (payload.action === 'login') {
       const result = await writeStore(kv, async data =>
-        loginWithPassword(data, payload.username, payload.password, payload.migration)
+        loginWithPassword(data, payload.username, payload.password)
       );
       if (result.error) return json(result, { status: 400 });
 
@@ -122,12 +151,13 @@ export async function onRequest(context) {
         username: result.username,
         sessionToken: session.token,
         expiresAt: session.expiresAt,
+        isAdmin: isAdmin(result.username),
       });
     }
 
     const auth = await authenticateRequest(kv, request, payload);
     if (auth.error) return json(auth, { status: 401 });
-    return json({ ok: true, username: auth.username });
+    return json({ ok: true, username: auth.username, isAdmin: isAdmin(auth.username) });
   }
 
   return methodNotAllowed();

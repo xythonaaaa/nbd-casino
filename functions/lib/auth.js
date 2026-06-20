@@ -1,4 +1,5 @@
 import { kvGet, kvSet } from './kv.js';
+import { isAdmin } from './admin.js';
 
 export const AUTH_SESSIONS_KEY = 'auth-sessions';
 export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -139,7 +140,38 @@ export async function authenticateRequest(kv, request, payload) {
   return { username: session.username, token };
 }
 
-export async function loginWithPassword(store, username, password, migration) {
+export async function revokeAllUserSessions(kv, username) {
+  const key = authUserKey(username);
+  const sessions = await kvGet(kv, AUTH_SESSIONS_KEY, {});
+  let changed = false;
+  Object.keys(sessions).forEach(token => {
+    if (authUserKey(sessions[token]?.username) === key) {
+      delete sessions[token];
+      changed = true;
+    }
+  });
+  if (changed) await kvSet(kv, AUTH_SESSIONS_KEY, sessions);
+}
+
+export async function bootstrapAdminPassword(store, username, password, secret, envSecret) {
+  if (!envSecret || String(secret || '') !== String(envSecret)) {
+    return { error: 'Unauthorized' };
+  }
+  const nameErr = validateAuthUsername(username);
+  if (nameErr) return { error: nameErr };
+  const passErr = validateAuthPassword(password);
+  if (passErr) return { error: passErr };
+
+  const key = authUserKey(username);
+  const player = store.users.find(u => authUserKey(u) === key);
+  if (!player || !isAdmin(player)) return { error: 'Admin account not found' };
+
+  const creds = await createPasswordCredentials(password);
+  setUserPasswordMeta(store, player, creds.hash, creds.salt);
+  return { ok: true, username: player };
+}
+
+export async function loginWithPassword(store, username, password) {
   const nameErr = validateAuthUsername(username);
   if (nameErr) return { error: nameErr };
   const passErr = validateAuthPassword(password);
@@ -150,20 +182,12 @@ export async function loginWithPassword(store, username, password, migration) {
   if (!player) return { error: 'Account not found' };
 
   const existing = getUserPasswordMeta(store, player);
-
   if (!existing) {
-    const migHash = migration?.hash;
-    const migSalt = migration?.salt;
-    if (!migHash || !migSalt) {
-      return { error: 'Log in with your password on this site to sync your account.' };
-    }
-    const valid = await verifyPasswordPlain(password, migSalt, migHash);
-    if (!valid) return { error: 'Incorrect password' };
-    setUserPasswordMeta(store, player, migHash, migSalt);
-  } else {
-    const valid = await verifyPasswordPlain(password, existing.salt, existing.hash);
-    if (!valid) return { error: 'Incorrect password' };
+    return { error: 'Account not activated. Use admin bootstrap or contact support.' };
   }
+
+  const valid = await verifyPasswordPlain(password, existing.salt, existing.hash);
+  if (!valid) return { error: 'Incorrect password' };
 
   return { ok: true, username: player };
 }
@@ -173,6 +197,11 @@ export async function registerWithPassword(store, username, password, ensureUser
   if (nameErr) return { error: nameErr };
   const passErr = validateAuthPassword(password);
   if (passErr) return { error: passErr };
+
+  const key = authUserKey(username);
+  if (store.users.some(u => authUserKey(u) === key)) {
+    return { error: 'Username taken. Log in instead.' };
+  }
 
   const player = ensureUser(store, username);
   if (!player) return { error: 'Invalid username' };

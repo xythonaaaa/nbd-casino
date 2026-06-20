@@ -15,7 +15,18 @@ const WALLET_STORAGE_KEY = 'xython-wallet';
 const VAULT_STORAGE_KEY = 'xython-vault';
 const ADMIN_USERNAMES = ['ceo'];
 
+let serverAuthProfile = { username: null, isAdmin: false };
+let sessionVerifyTimer = null;
+const SESSION_VERIFY_MS = 30000;
+
 function isAdmin(username) {
+  if (getAuthApiUrl()) {
+    if (!isLoggedIn()) return false;
+    const name = (username || getLoggedInUsername() || '').trim().toLowerCase();
+    if (!name) return false;
+    return serverAuthProfile.isAdmin
+      && String(serverAuthProfile.username || '').trim().toLowerCase() === name;
+  }
   const name = (username || getLoggedInUsername() || '').trim().toLowerCase();
   if (!name) return false;
   return ADMIN_USERNAMES.some(u => u.toLowerCase() === name);
@@ -351,6 +362,7 @@ async function serverClaimReward({ kind, amount, tx }) {
 }
 
 function applyInternalWalletDelta(currency, delta, tx) {
+  if (usesServerWallet()) return;
   if (!delta) return;
   walletMutationAllowed = true;
   const cur = currency || window.XythonWallet?.getActiveCurrency?.() || 'USD';
@@ -2355,6 +2367,7 @@ function escapeHtml(text) {
 }
 
 function getLoggedInUser() {
+  if (getAuthApiUrl() && !getSessionToken()) return null;
   try {
     const raw = localStorage.getItem(USER_STORAGE_KEY);
     if (!raw) return null;
@@ -2395,17 +2408,60 @@ function getSessionToken() {
   }
 }
 
-function saveSession(token, username, expiresAt) {
+function saveSession(token, username, expiresAt, isAdminFlag = false) {
   if (!token) return;
+  serverAuthProfile = {
+    username: username || getLoggedInUsername(),
+    isAdmin: !!isAdminFlag,
+  };
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
     token,
     username: username || getLoggedInUsername(),
     expiresAt: expiresAt || 0,
+    isAdmin: !!isAdminFlag,
   }));
 }
 
 function clearSession() {
   localStorage.removeItem(SESSION_STORAGE_KEY);
+  serverAuthProfile = { username: null, isAdmin: false };
+}
+
+function purgeInsecureClientStorage() {
+  if (!getAuthApiUrl()) return;
+  localStorage.removeItem(WALLET_STORAGE_KEY);
+  if (!getSessionToken()) {
+    localStorage.removeItem(USER_STORAGE_KEY);
+    resetServerWalletCache();
+    serverAuthProfile = { username: null, isAdmin: false };
+  }
+}
+
+function installProductionWalletGuard() {
+  if (!getWalletApiUrl() || !window.XythonWallet) return;
+  const blocked = () => ({ ok: false, error: 'Balance is managed by the server' });
+  const wallet = {
+    ...window.XythonWallet,
+    setBalance: blocked,
+    debitBet(currency, bet, tx) {
+      if (usesServerWallet()) return blocked();
+      return window.XythonWallet.debitBet.call(this, currency, bet, tx);
+    },
+  };
+  Object.freeze(wallet);
+  Object.defineProperty(window, 'XythonWallet', {
+    value: wallet,
+    writable: false,
+    configurable: false,
+  });
+}
+
+function startSessionVerifyPolling() {
+  if (!getAuthApiUrl()) return;
+  if (sessionVerifyTimer) clearInterval(sessionVerifyTimer);
+  sessionVerifyTimer = setInterval(() => {
+    if (getSessionToken()) verifyServerSession();
+  }, SESSION_VERIFY_MS);
 }
 
 async function postAuthAction(payload) {
@@ -2429,12 +2485,7 @@ async function serverRegisterAccount(username, password) {
 }
 
 async function serverLoginAccount(username, password) {
-  const account = getAccount(username);
-  const payload = { action: 'login', username, password };
-  if (account?.hash && account?.salt) {
-    payload.migration = { hash: account.hash, salt: account.salt };
-  }
-  return postAuthAction(payload);
+  return postAuthAction({ action: 'login', username, password });
 }
 
 async function verifyServerSession() {
@@ -2442,6 +2493,7 @@ async function verifyServerSession() {
   const token = getSessionToken();
   if (!url) return true;
   if (!token) {
+    purgeInsecureClientStorage();
     if (getLoggedInUser()) clearUser();
     return false;
   }
@@ -2454,6 +2506,10 @@ async function verifyServerSession() {
     }
     const data = await res.json();
     if (data.username) saveUser(data.username);
+    serverAuthProfile = {
+      username: data.username || getLoggedInUsername(),
+      isAdmin: !!data.isAdmin,
+    };
     return true;
   } catch {
     return false;
@@ -2685,7 +2741,7 @@ async function createAccount(username, password) {
     if (!reg?.ok) {
       throw new Error(reg?.data?.error || 'Could not register on server');
     }
-    saveSession(reg.data.sessionToken, reg.data.username, reg.data.expiresAt);
+    saveSession(reg.data.sessionToken, reg.data.username, reg.data.expiresAt, reg.data.isAdmin);
   } else {
     await registerUserOnWalletServer(username);
   }
@@ -3191,7 +3247,7 @@ function renderAuthUI() {
   const container = document.querySelector('.header-actions');
   if (!container) return;
 
-  const user = getLoggedInUser();
+  const user = isLoggedIn() ? getLoggedInUser() : null;
   if (user) {
     const initial = escapeHtml(user.username[0].toUpperCase());
     const name = escapeHtml(user.username);
@@ -4085,7 +4141,7 @@ function initAuthModal() {
         passwordInput.focus();
         return;
       }
-      saveSession(login.data.sessionToken, login.data.username, login.data.expiresAt);
+      saveSession(login.data.sessionToken, login.data.username, login.data.expiresAt, login.data.isAdmin);
     }
 
     saveUser(username);
@@ -5536,6 +5592,7 @@ function initCommon() {
   }
 
   const finishInit = () => {
+    purgeInsecureClientStorage();
     captureReferralFromUrl();
     backfillRegisteredUsers();
     initSidebarNav();

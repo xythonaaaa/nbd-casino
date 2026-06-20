@@ -471,7 +471,7 @@ function dropBall(bet, currency, serverOutcome) {
     bet,
     currency,
     finished: false,
-    paid: true,
+    paid: false,
   });
 
   startAnimationLoop();

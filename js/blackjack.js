@@ -554,7 +554,7 @@ function updateUI() {
   els.stand.disabled = !playing || !activeHand || activeHand.done;
   els.doubleDown.disabled = !(playing && activeHand && activeHand.cards.length === 2 && !activeHand.doubled && !activeHand.done);
   els.split.disabled = !canSplit();
-  els.placeBet.disabled = locked || state.phase === 'playing' || state.phase === 'dealer';
+  els.placeBet.disabled = locked || state.phase !== 'idle';
   els.bet.disabled = locked || state.phase === 'playing' || state.phase === 'dealer';
   els.half.disabled = locked || state.phase === 'playing';
   els.doubleBet.disabled = locked || state.phase === 'playing';
@@ -571,7 +571,7 @@ function updateUI() {
 }
 
 async function placeBet() {
-  if (state.busy) return;
+  if (state.busy || state.phase !== 'idle') return;
 
   if (!window.XythonAuth?.requireAuth?.('register')) {
     setMessage('Register to place bets', 'lose');
@@ -594,8 +594,13 @@ async function placeBet() {
     return;
   }
 
+  state.busy = true;
+  updateUI();
+
   const debitResult = await bjOpenSession(totalWager, `Bet $${totalWager.toFixed(2)}`);
   if (!debitResult?.ok) {
+    state.busy = false;
+    updateUI();
     setMessage(debitResult?.error || 'Could not place bet', 'lose');
     return;
   }
@@ -603,7 +608,6 @@ async function placeBet() {
   state.sideBets = sideBets;
   state.deck = shuffle(createDeck());
   state.phase = 'dealing';
-  state.busy = true;
   hidePopup();
   setMessage('');
   clearTable();

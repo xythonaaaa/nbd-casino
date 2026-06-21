@@ -5844,18 +5844,175 @@ function initCommon() {
   };
 
   hydrateSessionFromStorage();
-  const runFinishInit = finishInit;
-  if (document.body?.dataset?.page === 'leaderboard') {
-    runFinishInit();
-  }
   if (getAuthApiUrl()) {
-    verifyServerSession().finally(() => {
-      if (document.body?.dataset?.page !== 'leaderboard') runFinishInit();
-    });
-  } else if (document.body?.dataset?.page !== 'leaderboard') {
-    runFinishInit();
+    verifyServerSession().finally(finishInit);
+  } else {
+    finishInit();
   }
 }
+
+const LB_ORIGINALS_GAMES = new Set([
+  'blackjack', 'double-down-blackjack', 'plinko', 'roulette', 'dice', 'mines', 'crash',
+  'keno', 'limbo', 'war', 'coinflip', 'hilo', 'tower', 'wheel',
+]);
+const LB_BANNED_USERS = new Set(['tiddlesz']);
+let lbActiveFilter = 'originals';
+
+function lbFormatMoney(value) {
+  return `$${(parseFloat(value) || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function lbPlayerKey(win) {
+  if (win.hidden) return '__hidden__';
+  return (win.user || 'Player').trim().toLowerCase() || '__unknown__';
+}
+
+function lbDisplayName(win, key) {
+  if (key === '__hidden__') return 'Hidden';
+  return win.user || 'Player';
+}
+
+function lbIsBlockedWin(win) {
+  if ((parseFloat(win?.bet) || 0) > LEADERBOARD_MAX_BET) return true;
+  if (LB_BANNED_USERS.has(lbPlayerKey(win))) return true;
+  return false;
+}
+
+function lbAggregateWins(wins, filter) {
+  const filtered = wins.filter(w => {
+    if (lbIsBlockedWin(w)) return false;
+    if (filter === 'originals') return LB_ORIGINALS_GAMES.has(w.game);
+    return true;
+  });
+
+  const byPlayer = new Map();
+  filtered.forEach(win => {
+    const bet = parseFloat(win.bet) || 0;
+    const payout = parseFloat(win.payout) || 0;
+    const profit = payout - bet;
+    const key = lbPlayerKey(win);
+
+    if (!byPlayer.has(key)) {
+      byPlayer.set(key, {
+        key,
+        hidden: key === '__hidden__',
+        name: lbDisplayName(win, key),
+        totalProfit: 0,
+        totalPayout: 0,
+        winCount: 0,
+        biggestWin: 0,
+      });
+    }
+
+    const row = byPlayer.get(key);
+    row.totalProfit += profit;
+    row.totalPayout += payout;
+    row.winCount += 1;
+    if (payout > row.biggestWin) row.biggestWin = payout;
+  });
+
+  return Array.from(byPlayer.values())
+    .sort((a, b) => b.totalProfit - a.totalProfit || b.biggestWin - a.biggestWin || b.winCount - a.winCount);
+}
+
+function renderRankingsPage() {
+  const tbody = document.getElementById('leaderboardBody');
+  const meta = document.getElementById('leaderboardMeta');
+  if (!tbody) return;
+
+  try {
+    const wins = window.NbdLeaderboard?.getRecentWins?.(500) || [];
+    const rows = lbAggregateWins(wins, lbActiveFilter);
+    const me = (getLoggedInUsername() || '').trim().toLowerCase();
+    const scope = lbActiveFilter === 'originals' ? 'Originals' : 'All games';
+    const liveLabel = window.NbdLeaderboard?.isShared?.() ? 'Live' : 'Offline';
+
+    if (meta) {
+      meta.textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} · ${scope} · ${liveLabel}`;
+    }
+
+    if (!rows.length) {
+      tbody.innerHTML = '';
+      const empty = document.getElementById('leaderboardEmpty');
+      if (empty) empty.hidden = false;
+      return;
+    }
+
+    const empty = document.getElementById('leaderboardEmpty');
+    if (empty) empty.hidden = true;
+
+    tbody.innerHTML = rows.map((row, index) => {
+      const rank = index + 1;
+      const rankClass = rank <= 3 ? ` leaderboard-rank--${rank}` : '';
+      const isMe = !row.hidden && me && row.key === me;
+      const playerClass = row.hidden ? ' leaderboard-player--hidden' : '';
+      const initial = (row.name || '?').trim().charAt(0).toUpperCase() || '?';
+
+      return `<tr class="${isMe ? 'is-me' : ''}">
+      <td><span class="leaderboard-rank${rankClass}">${rank}</span></td>
+      <td>
+        <div class="leaderboard-player${playerClass}">
+          <span class="leaderboard-avatar" aria-hidden="true">${escapeHtml(initial)}</span>
+          <span>${escapeHtml(row.name)}</span>
+        </div>
+      </td>
+      <td><span class="leaderboard-amount">${lbFormatMoney(row.totalProfit)}</span></td>
+      <td><span class="leaderboard-amount--muted">${lbFormatMoney(row.biggestWin)}</span></td>
+      <td><span class="leaderboard-amount--muted">${row.winCount.toLocaleString()}</span></td>
+    </tr>`;
+    }).join('');
+  } catch {
+    if (meta) meta.textContent = 'Could not load leaderboard';
+    tbody.innerHTML = '';
+    const empty = document.getElementById('leaderboardEmpty');
+    if (empty) empty.hidden = false;
+  }
+}
+
+function initRankingsPage() {
+  if (initRankingsPage.done) return;
+  initRankingsPage.done = true;
+
+  const maxBet = LEADERBOARD_MAX_BET;
+  const noteEl = document.getElementById('leaderboardNote');
+  if (noteEl) {
+    noteEl.textContent = `Only bets up to $${maxBet.toLocaleString()} per round appear on the leaderboard and live feed.`;
+  }
+
+  document.querySelectorAll('.leaderboard-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const filter = btn.dataset.filter;
+      if (!filter || filter === lbActiveFilter) return;
+      lbActiveFilter = filter;
+      document.querySelectorAll('.leaderboard-filter').forEach(b => {
+        b.classList.toggle('active', b.dataset.filter === lbActiveFilter);
+      });
+      renderRankingsPage();
+    });
+  });
+
+  document.addEventListener('xython:leaderboard-change', renderRankingsPage);
+  renderRankingsPage();
+  void refreshLeaderboard();
+}
+
+(function scheduleRankingsPageBoot() {
+  if (document.body?.dataset?.page !== 'leaderboard') return;
+
+  const run = () => {
+    initCommon();
+    initRankingsPage();
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', run);
+  } else {
+    run();
+  }
+})();
 
 function initGameInfoLoader() {
   if (document.body.dataset.page !== 'originals') return;

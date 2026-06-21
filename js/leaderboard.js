@@ -30,7 +30,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.addEventListener('xython:leaderboard-change', renderLeaderboard);
-  renderLeaderboard();
+
+  void (async () => {
+    try {
+      await window.NbdLeaderboard?.refresh?.();
+    } catch { /* ignore */ }
+    renderLeaderboard();
+  })();
 });
 
 function formatMoney(value) {
@@ -38,6 +44,12 @@ function formatMoney(value) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function lbEscape(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 function playerKey(win) {
@@ -100,51 +112,55 @@ function getInitial(name) {
   return text.charAt(0).toUpperCase();
 }
 
-async function renderLeaderboard() {
+function renderLeaderboard() {
   const tbody = document.getElementById('leaderboardBody');
   const meta = document.getElementById('leaderboardMeta');
   if (!tbody) return;
 
-  if (window.NbdLeaderboard?.refresh) {
-    await window.NbdLeaderboard.refresh();
-  }
-
-  const wins = window.NbdLeaderboard?.getRecentWins?.(500) || [];
-  const rows = aggregateLeaderboard(wins, activeFilter);
-  const me = (typeof getLoggedInUsername === 'function' ? (getLoggedInUsername() || '') : '').trim().toLowerCase();
-
-  if (meta) {
+  try {
+    const wins = window.NbdLeaderboard?.getRecentWins?.(500) || [];
+    const rows = aggregateLeaderboard(wins, activeFilter);
+    const me = (window.XythonAuth?.getUsername?.() || '').trim().toLowerCase();
     const scope = activeFilter === 'originals' ? 'Originals' : 'All games';
-    meta.textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} · ${scope} · Live`;
-  }
+    const liveLabel = window.NbdLeaderboard?.isShared?.() ? 'Live' : 'Offline';
 
-  if (!rows.length) {
-    tbody.innerHTML = '';
+    if (meta) {
+      meta.textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} · ${scope} · ${liveLabel}`;
+    }
+
+    if (!rows.length) {
+      tbody.innerHTML = '';
+      const empty = document.getElementById('leaderboardEmpty');
+      if (empty) empty.hidden = false;
+      return;
+    }
+
     const empty = document.getElementById('leaderboardEmpty');
-    if (empty) empty.hidden = false;
-    return;
-  }
+    if (empty) empty.hidden = true;
 
-  const empty = document.getElementById('leaderboardEmpty');
-  if (empty) empty.hidden = true;
+    tbody.innerHTML = rows.map((row, index) => {
+      const rank = index + 1;
+      const rankClass = rank <= 3 ? ` leaderboard-rank--${rank}` : '';
+      const isMe = !row.hidden && me && row.key === me;
+      const playerClass = row.hidden ? ' leaderboard-player--hidden' : '';
 
-  tbody.innerHTML = rows.map((row, index) => {
-    const rank = index + 1;
-    const rankClass = rank <= 3 ? ` leaderboard-rank--${rank}` : '';
-    const isMe = !row.hidden && me && row.key === me;
-    const playerClass = row.hidden ? ' leaderboard-player--hidden' : '';
-
-    return `<tr class="${isMe ? 'is-me' : ''}">
+      return `<tr class="${isMe ? 'is-me' : ''}">
       <td><span class="leaderboard-rank${rankClass}">${rank}</span></td>
       <td>
         <div class="leaderboard-player${playerClass}">
-          <span class="leaderboard-avatar" aria-hidden="true">${escapeHtml(getInitial(row.name))}</span>
-          <span>${escapeHtml(row.name)}</span>
+          <span class="leaderboard-avatar" aria-hidden="true">${lbEscape(getInitial(row.name))}</span>
+          <span>${lbEscape(row.name)}</span>
         </div>
       </td>
       <td><span class="leaderboard-amount">${formatMoney(row.totalProfit)}</span></td>
       <td><span class="leaderboard-amount--muted">${formatMoney(row.biggestWin)}</span></td>
       <td><span class="leaderboard-amount--muted">${row.winCount.toLocaleString()}</span></td>
     </tr>`;
-  }).join('');
+    }).join('');
+  } catch {
+    if (meta) meta.textContent = 'Could not load leaderboard';
+    tbody.innerHTML = '';
+    const empty = document.getElementById('leaderboardEmpty');
+    if (empty) empty.hidden = false;
+  }
 }

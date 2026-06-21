@@ -2072,6 +2072,7 @@ const LEADERBOARD_MAX_BET = 5000;
 let leaderboardCache = { wins: [], bets: {}, recentBets: [] };
 let leaderboardUsingServer = false;
 let leaderboardPollTimer = null;
+let leaderboardRefreshPromise = null;
 
 function getLeaderboardApiUrl() {
   if (window.NBD_LEADERBOARD_API) return window.NBD_LEADERBOARD_API;
@@ -2117,7 +2118,10 @@ async function fetchLeaderboardFromServer() {
   if (!url) return null;
 
   try {
-    const res = await trustedFetch(url, { cache: 'no-store' });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const res = await trustedFetch(url, { cache: 'no-store', signal: controller.signal });
+    clearTimeout(timeout);
     if (!res.ok) return null;
     const data = await res.json();
     return normalizeLeaderboardData(data);
@@ -2127,18 +2131,26 @@ async function fetchLeaderboardFromServer() {
 }
 
 async function refreshLeaderboard() {
-  const remote = await fetchLeaderboardFromServer();
-  if (remote !== null) {
-    leaderboardUsingServer = true;
-    leaderboardCache = remote;
+  if (leaderboardRefreshPromise) return leaderboardRefreshPromise;
+
+  leaderboardRefreshPromise = (async () => {
+    const remote = await fetchLeaderboardFromServer();
+    if (remote !== null) {
+      leaderboardUsingServer = true;
+      leaderboardCache = remote;
+    } else {
+      leaderboardUsingServer = false;
+      leaderboardCache = loadLeaderboardLocal();
+    }
     document.dispatchEvent(new CustomEvent('xython:leaderboard-change', { detail: leaderboardCache }));
     return leaderboardCache;
-  }
+  })();
 
-  leaderboardUsingServer = false;
-  leaderboardCache = loadLeaderboardLocal();
-  document.dispatchEvent(new CustomEvent('xython:leaderboard-change', { detail: leaderboardCache }));
-  return leaderboardCache;
+  try {
+    return await leaderboardRefreshPromise;
+  } finally {
+    leaderboardRefreshPromise = null;
+  }
 }
 
 function startLeaderboardPolling() {

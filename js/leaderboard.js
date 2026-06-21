@@ -31,12 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.addEventListener('xython:leaderboard-change', renderLeaderboard);
 
-  void (async () => {
-    try {
-      await window.NbdLeaderboard?.refresh?.();
-    } catch { /* ignore */ }
-    renderLeaderboard();
-  })();
+  renderLeaderboard();
+  void window.NbdLeaderboard?.refresh?.();
 });
 
 function formatMoney(value) {

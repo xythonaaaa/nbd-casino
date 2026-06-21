@@ -2117,11 +2117,17 @@ async function fetchLeaderboardFromServer() {
   const url = getLeaderboardApiUrl();
   if (!url) return null;
 
+  const timeoutMs = 8000;
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    const res = await trustedFetch(url, { cache: 'no-store', signal: controller.signal });
-    clearTimeout(timeout);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const res = await Promise.race([
+      trustedFetch(url, { cache: 'no-store', signal: controller.signal }),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Leaderboard fetch timeout')), timeoutMs);
+      }),
+    ]);
+    clearTimeout(timer);
     if (!res.ok) return null;
     const data = await res.json();
     return normalizeLeaderboardData(data);
@@ -2134,23 +2140,23 @@ async function refreshLeaderboard() {
   if (leaderboardRefreshPromise) return leaderboardRefreshPromise;
 
   leaderboardRefreshPromise = (async () => {
-    const remote = await fetchLeaderboardFromServer();
-    if (remote !== null) {
-      leaderboardUsingServer = true;
-      leaderboardCache = remote;
-    } else {
-      leaderboardUsingServer = false;
-      leaderboardCache = loadLeaderboardLocal();
+    try {
+      const remote = await fetchLeaderboardFromServer();
+      if (remote !== null) {
+        leaderboardUsingServer = true;
+        leaderboardCache = remote;
+      } else {
+        leaderboardUsingServer = false;
+        leaderboardCache = loadLeaderboardLocal();
+      }
+      document.dispatchEvent(new CustomEvent('xython:leaderboard-change', { detail: leaderboardCache }));
+      return leaderboardCache;
+    } finally {
+      leaderboardRefreshPromise = null;
     }
-    document.dispatchEvent(new CustomEvent('xython:leaderboard-change', { detail: leaderboardCache }));
-    return leaderboardCache;
   })();
 
-  try {
-    return await leaderboardRefreshPromise;
-  } finally {
-    leaderboardRefreshPromise = null;
-  }
+  return leaderboardRefreshPromise;
 }
 
 function startLeaderboardPolling() {
@@ -5838,10 +5844,16 @@ function initCommon() {
   };
 
   hydrateSessionFromStorage();
+  const runFinishInit = finishInit;
+  if (document.body?.dataset?.page === 'leaderboard') {
+    runFinishInit();
+  }
   if (getAuthApiUrl()) {
-    verifyServerSession().finally(finishInit);
-  } else {
-    finishInit();
+    verifyServerSession().finally(() => {
+      if (document.body?.dataset?.page !== 'leaderboard') runFinishInit();
+    });
+  } else if (document.body?.dataset?.page !== 'leaderboard') {
+    runFinishInit();
   }
 }
 
